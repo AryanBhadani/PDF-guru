@@ -401,4 +401,10 @@ export const en = {
   },
 } as const;
 
-export type Messages = typeof en;
+type DeepStringify<T> = {
+  [K in keyof T]: T[K] extends object
+  ? DeepStringify<T[K]>
+  : string;
+};
+
+export type Messages = DeepStringify<typeof en>;
