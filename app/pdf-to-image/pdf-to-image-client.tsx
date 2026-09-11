@@ -16,6 +16,7 @@ import { PDF_MIME_TYPE } from "@/lib/constants";
 import { getPdfPageCount } from "@/lib/pdf";
 import { downloadBlob } from "@/lib/utils";
 import type { ImageOutputFormat, ImageQualityLevel } from "@/types/conversion";
+import { useT } from "@/components/i18n/language-provider";
 
 type Preview = {
   pageNumber: number;
@@ -24,6 +25,7 @@ type Preview = {
 };
 
 export function PdfToImageClient() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
@@ -53,15 +55,15 @@ export function PdfToImageClient() {
       clearPreviews();
       setFile(next);
       setPageCount(count);
-      toast.success(`Loaded ${count} page${count === 1 ? "" : "s"}.`);
+      toast.success(t("upload.loadedPages", { count }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
   const convert = async () => {
     if (!file || loading) {
-      if (!file) toast.error("Upload a PDF first.");
+      if (!file) toast.error(t("errors.uploadPdfFirst"));
       return;
     }
     setLoading(true);
@@ -81,9 +83,9 @@ export function PdfToImageClient() {
           url: URL.createObjectURL(page.blob),
         }))
       );
-      toast.success(`${pages.length} image${pages.length === 1 ? "" : "s"} ready.`);
+      toast.success(t("success.imagesReady", { count: pages.length }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not convert this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.conversion"));
     } finally {
       setLoading(false);
     }
@@ -102,16 +104,13 @@ export function PdfToImageClient() {
   };
 
   return (
-    <PdfToolLayout
-      title="PDF to Image"
-      description="Export every page as PNG, JPG, or WEBP. Download one image or all of them as a ZIP."
-    >
+    <PdfToolLayout title={t("tools.pdfToImage.pageTitle")} description={t("tools.pdfToImage.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
           accept="application/pdf,.pdf"
           multiple={false}
-          title="Drop a PDF here"
-          hint="One PDF · each page becomes an image"
+          title={t("upload.dropPdf")}
+          hint={t("upload.hintOnePdf")}
           disabled={loading}
           allowedTypes={[PDF_MIME_TYPE]}
           onFiles={handleFiles}
@@ -119,15 +118,15 @@ export function PdfToImageClient() {
         {!file ? (
           <EmptyState
             icon={<ImageDown className="h-8 w-8" />}
-            title="No PDF selected"
-            hint="Upload a document to export page images."
+            title={t("tools.pdfToImage.emptyTitle")}
+            hint={t("tools.pdfToImage.emptyHint")}
           />
         ) : (
           <>
             <SelectedFile
               name={file.name}
               size={file.size}
-              extra={`${pageCount} page${pageCount === 1 ? "" : "s"}`}
+              extra={`${pageCount} ${t("common.pages")}`}
               disabled={loading}
               onClear={() => {
                 setFile(null);
@@ -136,7 +135,7 @@ export function PdfToImageClient() {
             />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="format">Format</Label>
+                <Label htmlFor="format">{t("tools.pdfToImage.format")}</Label>
                 <NativeSelect
                   id="format"
                   value={format}
@@ -149,7 +148,7 @@ export function PdfToImageClient() {
                 </NativeSelect>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="quality">Quality</Label>
+                <Label htmlFor="quality">{t("tools.pdfToImage.quality")}</Label>
                 <NativeSelect
                   id="quality"
                   value={quality}
@@ -162,10 +161,10 @@ export function PdfToImageClient() {
                 </NativeSelect>
               </div>
             </div>
-            {loading && <ProgressBar current={progress.current} total={progress.total} label="Rendering pages" />}
+            {loading && <ProgressBar current={progress.current} total={progress.total} label={t("tools.pdfToImage.converting")} />}
             <DownloadButton
-              label="Convert pages"
-              loadingLabel="Rendering…"
+              label={t("tools.pdfToImage.convert")}
+              loadingLabel={t("tools.pdfToImage.converting")}
               loading={loading}
               onClick={convert}
             />
@@ -174,8 +173,10 @@ export function PdfToImageClient() {
         {previews.length > 0 && (
           <div className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-medium">{previews.length} image{previews.length === 1 ? "" : "s"}</p>
-              <Button onClick={downloadAll}>Download all as ZIP</Button>
+              <p className="text-sm font-medium">
+                {previews.length} {t("common.images")}
+              </p>
+              <Button onClick={downloadAll}>{t("tools.pdfToImage.zip")}</Button>
             </div>
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {previews.map((item) => (
@@ -183,7 +184,9 @@ export function PdfToImageClient() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={item.url} alt={`Page ${item.pageNumber}`} className="h-48 w-full object-contain bg-muted" />
                   <div className="flex items-center justify-between p-3">
-                    <p className="text-sm">Page {item.pageNumber}</p>
+                    <p className="text-sm">
+                      {t("common.page")} {item.pageNumber}
+                    </p>
                     <Button
                       size="sm"
                       variant="outline"
@@ -194,7 +197,7 @@ export function PdfToImageClient() {
                         )
                       }
                     >
-                      Download
+                      {t("common.download")}
                     </Button>
                   </div>
                 </li>

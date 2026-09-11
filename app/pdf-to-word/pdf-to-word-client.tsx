@@ -80,7 +80,7 @@ export function PdfToWordClient() {
           />
         ) : (
           <>
-            <SelectedFile name={file.name} size={file.size} pageCount={pageCount} />
+            <SelectedFile name={file.name} size={file.size} extra={`${pageCount} ${t("common.pages")}`} />
             {loading && (
               <ProgressBar current={progress.current} total={progress.total || pageCount} label={t("tools.pdfToWord.converting")} />
             )}
@@ -88,7 +88,7 @@ export function PdfToWordClient() {
               <Card>
                 <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
                   <p>{t("tools.pdfToWord.chars", { count: result.charCount, pages: result.pageCount })}</p>
-                  {result.likelyScanned && <p>{t("tools.pdfToWord.ocrWarning")}</p>}
+                  {(result.likelyScanned || result.usedOcr) && <p>{t("tools.pdfToWord.ocrWarning")}</p>}
                 </CardContent>
               </Card>
             )}

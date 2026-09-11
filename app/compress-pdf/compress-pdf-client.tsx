@@ -16,14 +16,10 @@ import { PDF_MIME_TYPE } from "@/lib/constants";
 import { downloadPdf, getPdfPageCount } from "@/lib/pdf";
 import { formatFileSize } from "@/lib/utils";
 import type { CompressLevel, CompressResult } from "@/types/conversion";
-
-const LEVELS: Array<{ value: CompressLevel; label: string; hint: string }> = [
-  { value: "low", label: "Low compression / High quality", hint: "Keeps more detail" },
-  { value: "medium", label: "Medium", hint: "Balanced size and quality" },
-  { value: "high", label: "High compression / Smaller file", hint: "Smaller file, lower quality" },
-];
+import { useT } from "@/components/i18n/language-provider";
 
 export function CompressPdfClient() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [level, setLevel] = useState<CompressLevel>("medium");
@@ -39,15 +35,15 @@ export function CompressPdfClient() {
       setFile(next);
       setPageCount(count);
       setResult(null);
-      toast.success("PDF loaded.");
+      toast.success(t("upload.pdfLoaded"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
   const compress = async () => {
     if (!file || loading) {
-      if (!file) toast.error("Upload a PDF first.");
+      if (!file) toast.error(t("errors.uploadPdfFirst"));
       return;
     }
     setLoading(true);
@@ -58,12 +54,12 @@ export function CompressPdfClient() {
       const next = await compressPdf(file, level, (current, total) => setProgress({ current, total }));
       setResult(next);
       if (next.reduced) {
-        toast.success(`Compressed by ${next.reductionPercent}%.`);
+        toast.success(t("success.compressed", { percent: next.reductionPercent }));
       } else {
-        toast.message("This PDF could not be reduced further.");
+        toast.message(t("tools.compressPdf.notReduced"));
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not compress this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.processing"));
     } finally {
       setLoading(false);
     }
@@ -76,16 +72,13 @@ export function CompressPdfClient() {
   };
 
   return (
-    <PdfToolLayout
-      title="Compress PDF"
-      description="Reduce file size in the browser. We show the real result, even if the file barely changes."
-    >
+    <PdfToolLayout title={t("tools.compressPdf.pageTitle")} description={t("tools.compressPdf.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
           accept="application/pdf,.pdf"
           multiple={false}
-          title="Drop a PDF to compress"
-          hint="One PDF · up to 50 MB"
+          title={t("upload.dropPdf")}
+          hint={t("upload.hintOnePdf")}
           disabled={loading}
           allowedTypes={[PDF_MIME_TYPE]}
           onFiles={handleFiles}
@@ -93,15 +86,15 @@ export function CompressPdfClient() {
         {!file ? (
           <EmptyState
             icon={<Minimize2 className="h-8 w-8" />}
-            title="No PDF selected"
-            hint="Upload a document to compress it."
+            title={t("tools.compressPdf.emptyTitle")}
+            hint={t("tools.compressPdf.emptyHint")}
           />
         ) : (
           <>
             <SelectedFile
               name={file.name}
               size={file.size}
-              extra={`${pageCount} page${pageCount === 1 ? "" : "s"}`}
+              extra={`${pageCount} ${t("common.pages")}`}
               disabled={loading}
               onClear={() => {
                 setFile(null);
@@ -109,27 +102,22 @@ export function CompressPdfClient() {
               }}
             />
             <div className="grid gap-2 max-w-md">
-              <Label htmlFor="level">Compression level</Label>
+              <Label htmlFor="level">{t("tools.compressPdf.level")}</Label>
               <NativeSelect
                 id="level"
                 value={level}
                 disabled={loading}
                 onChange={(event) => setLevel(event.target.value as CompressLevel)}
               >
-                {LEVELS.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
+                <option value="low">{t("tools.compressPdf.low")}</option>
+                <option value="medium">{t("tools.compressPdf.medium")}</option>
+                <option value="high">{t("tools.compressPdf.high")}</option>
               </NativeSelect>
-              <p className="text-xs text-muted-foreground">
-                {LEVELS.find((item) => item.value === level)?.hint}
-              </p>
             </div>
-            {loading && <ProgressBar current={progress.current} total={progress.total} label="Compressing" />}
+            {loading && <ProgressBar current={progress.current} total={progress.total} label={t("tools.compressPdf.converting")} />}
             <DownloadButton
-              label="Compress PDF"
-              loadingLabel="Compressing…"
+              label={t("tools.compressPdf.convert")}
+              loadingLabel={t("tools.compressPdf.converting")}
               loading={loading}
               onClick={compress}
             />
@@ -138,17 +126,17 @@ export function CompressPdfClient() {
         {result && (
           <Card>
             <CardHeader>
-              <CardTitle>Result</CardTitle>
+              <CardTitle>{t("tools.compressPdf.result")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <p>Original: {formatFileSize(result.originalSize)}</p>
-              <p>Compressed: {formatFileSize(result.compressedSize)}</p>
+              <p>{t("tools.compressPdf.originalSize", { size: formatFileSize(result.originalSize) })}</p>
+              <p>{t("tools.compressPdf.compressedSize", { size: formatFileSize(result.compressedSize) })}</p>
               <p>
                 {result.reduced
-                  ? `Reduced by ${result.reductionPercent}%`
-                  : "No size reduction. The compressed file is the same size or larger."}
+                  ? t("tools.compressPdf.reduced", { percent: result.reductionPercent })
+                  : t("tools.compressPdf.notReduced")}
               </p>
-              <DownloadButton label="Download compressed PDF" onClick={download} />
+              <DownloadButton label={t("tools.compressPdf.download")} onClick={download} />
             </CardContent>
           </Card>
         )}

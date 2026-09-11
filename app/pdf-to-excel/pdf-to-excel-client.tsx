@@ -112,7 +112,7 @@ export function PdfToExcelClient() {
           />
         ) : (
           <>
-            <SelectedFile name={file.name} size={file.size} pageCount={pageCount} />
+            <SelectedFile name={file.name} size={file.size} extra={`${pageCount} ${t("common.pages")}`} />
             {loading && (
               <ProgressBar current={progress.current} total={progress.total || pageCount} label={t("tools.pdfToExcel.converting")} />
             )}

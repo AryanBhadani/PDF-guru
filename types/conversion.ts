@@ -12,6 +12,12 @@ export type ImageFit = "fit" | "fill" | "original";
 
 export type ImageQualityLevel = "low" | "medium" | "high";
 
+export type PhotoPdfQuality = "low" | "medium" | "high" | "original";
+
+export type PhotoPdfOptions = {
+  quality: PhotoPdfQuality;
+};
+
 export type PageNumberPosition = "none" | "bottom-center" | "bottom-right";
 
 export type ProgressCallback = (current: number, total: number) => void;

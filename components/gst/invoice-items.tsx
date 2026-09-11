@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { InvoiceItem } from "@/types/invoice";
+import { useT } from "@/components/i18n/language-provider";
 
 type InvoiceItemsProps = {
   items: InvoiceItem[];
@@ -15,6 +16,7 @@ type InvoiceItemsProps = {
 };
 
 export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsProps) {
+  const t = useT();
   const update = (id: string, patch: Partial<InvoiceItem>) => {
     onChange(items.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
@@ -22,23 +24,25 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Items</CardTitle>
+        <CardTitle>{t("tools.gstInvoice.items")}</CardTitle>
         <Button type="button" size="sm" onClick={onAdd} disabled={disabled}>
           <Plus className="h-4 w-4" />
-          Add item
+          {t("tools.gstInvoice.addItem")}
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {items.map((item, index) => (
           <div key={item.id} className="rounded-lg border p-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium">Item {index + 1}</p>
+              <p className="text-sm font-medium">
+                {t("tools.gstInvoice.item")} {index + 1}
+              </p>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 disabled={disabled || items.length === 1}
-                aria-label="Remove item"
+                aria-label={t("common.remove")}
                 onClick={() => onChange(items.filter((row) => row.id !== item.id))}
               >
                 <Trash2 className="h-4 w-4" />
@@ -46,7 +50,7 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               <div className="grid gap-2 sm:col-span-2 lg:col-span-2">
-                <Label>Description</Label>
+                <Label>{t("tools.gstInvoice.description")}</Label>
                 <Input
                   value={item.description}
                   disabled={disabled}
@@ -54,7 +58,7 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
                 />
               </div>
               <div className="grid gap-2">
-                <Label>HSN</Label>
+                <Label>{t("tools.gstInvoice.hsn")}</Label>
                 <Input
                   value={item.hsn}
                   disabled={disabled}
@@ -62,7 +66,7 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Qty</Label>
+                <Label>{t("tools.gstInvoice.qty")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -73,7 +77,7 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
                 />
               </div>
               <div className="grid gap-2">
-                <Label>Rate</Label>
+                <Label>{t("tools.gstInvoice.rate")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -84,7 +88,7 @@ export function InvoiceItems({ items, onChange, onAdd, disabled }: InvoiceItemsP
                 />
               </div>
               <div className="grid gap-2">
-                <Label>GST %</Label>
+                <Label>{t("tools.gstInvoice.gstPercent")}</Label>
                 <Input
                   type="number"
                   min={0}

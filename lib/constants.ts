@@ -117,10 +117,18 @@ export const SMART_TOOLS = [
   {
     href: "/pdf-to-word",
     title: "PDF to Word",
-    description: "Extract text from a PDF into an editable Word document.",
+    description: "Convert PDFs into an editable Word document with layout, tables, and OCR.",
     icon: "FileType",
     navLabel: "PDF to Word",
     i18n: "pdfToWord",
+  },
+  {
+    href: "/screenshot-to-word",
+    title: "Screenshot to Word",
+    description: "Turn screenshots into an editable Word document with OCR and tables.",
+    icon: "ScanText",
+    navLabel: "Screenshot to Word",
+    i18n: "screenshotToWord",
   },
   {
     href: "/pdf-to-excel",

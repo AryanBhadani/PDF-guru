@@ -105,34 +105,57 @@ export function formatMoney(value: number): string {
   });
 }
 
-export function validateInvoice(data: InvoiceFormData): string | null {
-  if (!data.seller.name.trim()) return "Enter the seller name.";
-  if (!data.seller.address.trim()) return "Enter the seller address.";
-  if (!data.seller.state.trim()) return "Select the seller state.";
+export type InvoiceErrorKey =
+  | "gst.errors.sellerName"
+  | "gst.errors.sellerAddress"
+  | "gst.errors.sellerState"
+  | "gst.errors.sellerGstin"
+  | "gst.errors.buyerName"
+  | "gst.errors.buyerAddress"
+  | "gst.errors.buyerState"
+  | "gst.errors.buyerGstin"
+  | "gst.errors.invoiceNumber"
+  | "gst.errors.date"
+  | "gst.errors.items"
+  | "gst.errors.itemDescription"
+  | "gst.errors.itemQty"
+  | "gst.errors.itemRate"
+  | "gst.errors.itemGst";
+
+export type InvoiceValidationError = {
+  key: InvoiceErrorKey;
+  vars?: { n: number };
+};
+
+export function validateInvoice(data: InvoiceFormData): InvoiceValidationError | null {
+  if (!data.seller.name.trim()) return { key: "gst.errors.sellerName" };
+  if (!data.seller.address.trim()) return { key: "gst.errors.sellerAddress" };
+  if (!data.seller.state.trim()) return { key: "gst.errors.sellerState" };
   if (data.seller.gstin.trim() && !GSTIN_REGEX.test(data.seller.gstin.trim().toUpperCase())) {
-    return "Seller GSTIN looks invalid.";
+    return { key: "gst.errors.sellerGstin" };
   }
-  if (!data.buyer.name.trim()) return "Enter the buyer name.";
-  if (!data.buyer.address.trim()) return "Enter the buyer address.";
-  if (!data.buyer.state.trim()) return "Select the buyer state.";
+  if (!data.buyer.name.trim()) return { key: "gst.errors.buyerName" };
+  if (!data.buyer.address.trim()) return { key: "gst.errors.buyerAddress" };
+  if (!data.buyer.state.trim()) return { key: "gst.errors.buyerState" };
   if (data.buyer.gstin.trim() && !GSTIN_REGEX.test(data.buyer.gstin.trim().toUpperCase())) {
-    return "Buyer GSTIN looks invalid.";
+    return { key: "gst.errors.buyerGstin" };
   }
-  if (!data.meta.invoiceNumber.trim()) return "Enter an invoice number.";
-  if (!data.meta.date) return "Choose an invoice date.";
-  if (data.items.length === 0) return "Add at least one item.";
+  if (!data.meta.invoiceNumber.trim()) return { key: "gst.errors.invoiceNumber" };
+  if (!data.meta.date) return { key: "gst.errors.date" };
+  if (data.items.length === 0) return { key: "gst.errors.items" };
 
   for (let i = 0; i < data.items.length; i += 1) {
     const item = data.items[i];
-    if (!item.description.trim()) return `Item ${i + 1} needs a description.`;
+    const n = i + 1;
+    if (!item.description.trim()) return { key: "gst.errors.itemDescription", vars: { n } };
     if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
-      return `Item ${i + 1} quantity must be greater than 0.`;
+      return { key: "gst.errors.itemQty", vars: { n } };
     }
     if (!Number.isFinite(item.rate) || item.rate < 0) {
-      return `Item ${i + 1} rate cannot be negative.`;
+      return { key: "gst.errors.itemRate", vars: { n } };
     }
     if (!Number.isFinite(item.gstPercent) || item.gstPercent < 0 || item.gstPercent > 28) {
-      return `Item ${i + 1} GST % must be between 0 and 28.`;
+      return { key: "gst.errors.itemGst", vars: { n } };
     }
   }
 

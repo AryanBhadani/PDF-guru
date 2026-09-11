@@ -15,8 +15,10 @@ import { DOCUMENT_MIME_TYPES } from "@/lib/constants";
 import { downloadPdf, getPdfPageCount } from "@/lib/pdf";
 import { downloadBlob } from "@/lib/utils";
 import type { MaskRect } from "@/types/masking";
+import { useT } from "@/components/i18n/language-provider";
 
 export function MaskDocumentClient() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [kind, setKind] = useState<"pdf" | "image">("image");
   const [pageCount, setPageCount] = useState(1);
@@ -81,15 +83,15 @@ export function MaskDocumentClient() {
         setRects(detected.rects);
         setHints(detected.hints);
         if (detected.rects.length > 0) {
-          toast.success(`Suggested ${detected.rects.length} mask area${detected.rects.length === 1 ? "" : "s"}.`);
+          toast.success(t("tools.maskDocument.hintSuggested", { count: detected.rects.length }));
         } else {
-          toast.message("No Aadhaar or PAN text found. Draw boxes manually.");
+          toast.message(t("tools.maskDocument.hintManual"));
         }
       } else {
-        toast.success("Image loaded. Draw boxes over sensitive areas.");
+        toast.success(t("upload.imageLoaded"));
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not open this file.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
@@ -99,17 +101,17 @@ export function MaskDocumentClient() {
     try {
       await loadPreview(file, kind, nextIndex);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not load this page.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
   const applyMask = async () => {
     if (!file || loading) {
-      if (!file) toast.error("Upload a document first.");
+      if (!file) toast.error(t("errors.uploadFirst"));
       return;
     }
     if (rects.length === 0) {
-      toast.error("Add at least one mask area.");
+      toast.error(t("tools.maskDocument.emptyHint"));
       return;
     }
     setLoading(true);
@@ -126,28 +128,25 @@ export function MaskDocumentClient() {
         const blob = await maskImageFile(file, rects);
         downloadBlob(blob, maskedFileName(file, "image"));
       }
-      toast.success("Masked file ready. Verify it before sharing.");
+      toast.success(t("success.masked"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not mask this document.");
+      toast.error(error instanceof Error ? error.message : t("errors.processing"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PdfToolLayout
-      title="Aadhaar / PAN masking"
-      description="Draw black boxes over sensitive details. Masking is burned into the exported file."
-    >
+    <PdfToolLayout title={t("tools.maskDocument.pageTitle")} description={t("tools.maskDocument.pageDesc")}>
       <div className="space-y-6">
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-          Always verify the masked document before sharing. Redaction is permanent in the download, but you must confirm nothing sensitive remains visible.
+          {t("tools.maskDocument.warning")}
         </div>
         <FileUpload
           accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
           multiple={false}
-          title="Drop a PDF or image"
-          hint="PDF, JPG, PNG, or WEBP · processed only on this device"
+          title={t("upload.dropPdfOrImage")}
+          hint={t("upload.hintImages")}
           disabled={loading}
           allowedTypes={DOCUMENT_MIME_TYPES}
           onFiles={handleFiles}
@@ -155,15 +154,15 @@ export function MaskDocumentClient() {
         {!file || !previewUrl ? (
           <EmptyState
             icon={<ShieldOff className="h-8 w-8" />}
-            title="No document selected"
-            hint="Upload an ID or PDF, then draw mask boxes."
+            title={t("tools.maskDocument.emptyTitle")}
+            hint={t("tools.maskDocument.emptyHint")}
           />
         ) : (
           <>
             <SelectedFile
               name={file.name}
               size={file.size}
-              extra={kind === "pdf" ? `${pageCount} page${pageCount === 1 ? "" : "s"}` : "Image"}
+              extra={kind === "pdf" ? `${pageCount} ${t("common.pages")}` : t("common.images")}
               disabled={loading}
               onClear={() => {
                 setFile(null);
@@ -183,17 +182,17 @@ export function MaskDocumentClient() {
                   disabled={loading || pageIndex === 0}
                   onClick={() => changePage(pageIndex - 1)}
                 >
-                  Previous page
+                  {t("common.previous")}
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Page {pageIndex + 1} of {pageCount}
+                  {t("common.page")} {pageIndex + 1} {t("common.of")} {pageCount}
                 </span>
                 <Button
                   variant="outline"
                   disabled={loading || pageIndex >= pageCount - 1}
                   onClick={() => changePage(pageIndex + 1)}
                 >
-                  Next page
+                  {t("common.next")}
                 </Button>
               </div>
             )}
@@ -206,16 +205,16 @@ export function MaskDocumentClient() {
             />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <p className="text-sm text-muted-foreground">
-                {rects.length} mask area{rects.length === 1 ? "" : "s"}. Drag to add. Tap a box to remove it.
+                {t("tools.maskDocument.areas", { count: rects.length })}
               </p>
               <Button variant="outline" disabled={loading || rects.length === 0} onClick={() => setRects([])}>
-                Clear masks
+                {t("tools.maskDocument.clearMasks")}
               </Button>
             </div>
-            {loading && <ProgressBar current={progress.current} total={progress.total} label="Applying redaction" />}
+            {loading && <ProgressBar current={progress.current} total={progress.total} label={t("tools.maskDocument.redacting")} />}
             <DownloadButton
-              label="Download masked file"
-              loadingLabel="Redacting…"
+              label={t("tools.maskDocument.download")}
+              loadingLabel={t("tools.maskDocument.redacting")}
               loading={loading}
               onClick={applyMask}
             />

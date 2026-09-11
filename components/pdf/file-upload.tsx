@@ -5,6 +5,7 @@ import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MAX_FILE_SIZE_BYTES } from "@/lib/constants";
+import { useT } from "@/components/i18n/language-provider";
 
 type FileUploadProps = {
   accept: string;
@@ -45,6 +46,7 @@ export function FileUpload({
   maxSize = MAX_FILE_SIZE_BYTES,
   allowedTypes,
 }: FileUploadProps) {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -56,15 +58,15 @@ export function FileUpload({
       const valid: File[] = [];
       for (const file of incoming) {
         if (!isAllowed(file, allowedTypes)) {
-          toast.error(`"${file.name}" is not a supported file type.`);
+          toast.error(t("upload.unsupported", { name: file.name }));
           continue;
         }
         if (file.size > maxSize) {
-          toast.error(`"${file.name}" is larger than ${Math.round(maxSize / (1024 * 1024))} MB.`);
+          toast.error(t("upload.tooLarge", { name: file.name, mb: Math.round(maxSize / (1024 * 1024)) }));
           continue;
         }
         if (file.size === 0) {
-          toast.error(`"${file.name}" is empty.`);
+          toast.error(t("upload.empty", { name: file.name }));
           continue;
         }
         valid.push(file);
@@ -72,7 +74,7 @@ export function FileUpload({
 
       if (valid.length > 0) onFiles(valid);
     },
-    [allowedTypes, maxSize, onFiles]
+    [allowedTypes, maxSize, onFiles, t]
   );
 
   return (

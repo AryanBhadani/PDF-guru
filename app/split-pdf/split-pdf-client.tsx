@@ -21,8 +21,10 @@ import {
   zipPdfs,
 } from "@/lib/pdf";
 import { downloadBlob, formatFileSize } from "@/lib/utils";
+import { useT } from "@/components/i18n/language-provider";
 
 export function SplitPdfClient() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [ranges, setRanges] = useState("1-1");
@@ -36,15 +38,15 @@ export function SplitPdfClient() {
       setFile(next);
       setPageCount(count);
       setRanges(count > 1 ? `1-${count}` : "1");
-      toast.success(`Loaded ${count} page${count === 1 ? "" : "s"}.`);
+      toast.success(t("upload.loadedPages", { count }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
   const splitByRange = async () => {
     if (!file) {
-      toast.error("Upload a PDF first.");
+      toast.error(t("errors.uploadPdfFirst"));
       return;
     }
     setLoading(true);
@@ -62,9 +64,9 @@ export function SplitPdfClient() {
         );
         downloadBlob(zip, "pdf-guru-split.zip");
       }
-      toast.success("Split complete.");
+      toast.success(t("success.split"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not split this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.processing"));
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export function SplitPdfClient() {
 
   const splitAll = async () => {
     if (!file) {
-      toast.error("Upload a PDF first.");
+      toast.error(t("errors.uploadPdfFirst"));
       return;
     }
     setLoading(true);
@@ -85,25 +87,22 @@ export function SplitPdfClient() {
         }))
       );
       downloadBlob(zip, "pdf-guru-pages.zip");
-      toast.success("Every page was extracted.");
+      toast.success(t("success.split"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not extract pages.");
+      toast.error(error instanceof Error ? error.message : t("errors.processing"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PdfToolLayout
-      title="Split PDF"
-      description="Extract selected pages or download every page as its own PDF."
-    >
+    <PdfToolLayout title={t("tools.splitPdf.pageTitle")} description={t("tools.splitPdf.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
           accept="application/pdf,.pdf"
           multiple={false}
-          title="Drop a PDF here"
-          hint="One PDF · up to 50 MB"
+          title={t("upload.dropPdf")}
+          hint={t("upload.hintOnePdf")}
           disabled={loading}
           allowedTypes={[PDF_MIME_TYPE]}
           onFiles={handleFiles}
@@ -112,8 +111,8 @@ export function SplitPdfClient() {
         {!file ? (
           <EmptyState
             icon={<Scissors className="h-8 w-8" />}
-            title="No PDF selected"
-            hint="Upload a document to choose pages."
+            title={t("tools.splitPdf.emptyTitle")}
+            hint={t("tools.splitPdf.emptyHint")}
           />
         ) : (
           <div className="space-y-4 rounded-xl border bg-card p-4">
@@ -122,12 +121,12 @@ export function SplitPdfClient() {
               <div>
                 <p className="font-medium">{file.name}</p>
                 <p className="text-sm text-muted-foreground">
-                  {formatFileSize(file.size)} · {pageCount} page{pageCount === 1 ? "" : "s"}
+                  {formatFileSize(file.size)} · {pageCount} {t("common.pages")}
                 </p>
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="ranges">Page ranges</Label>
+              <Label htmlFor="ranges">{t("tools.splitPdf.ranges")}</Label>
               <Input
                 id="ranges"
                 value={ranges}
@@ -136,18 +135,18 @@ export function SplitPdfClient() {
                 placeholder="1-3, 5, 7-9"
               />
               <p className="text-xs text-muted-foreground">
-                Use commas between ranges. Pages start at 1.
+                {t("tools.splitPdf.rangesHint")}
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <DownloadButton
-                label="Extract ranges"
-                loadingLabel="Extracting…"
+                label={t("tools.splitPdf.extract")}
+                loadingLabel={t("tools.splitPdf.extracting")}
                 loading={loading}
                 onClick={splitByRange}
               />
               <Button size="lg" variant="outline" disabled={loading} onClick={splitAll}>
-                Extract all pages as ZIP
+                {t("tools.splitPdf.extractAll")}
               </Button>
             </div>
           </div>

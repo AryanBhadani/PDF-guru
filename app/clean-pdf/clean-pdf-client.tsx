@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { RotateCcw, WandSparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PdfToolLayout } from "@/components/pdf/pdf-tool-layout";
@@ -114,7 +114,7 @@ export function CleanPdfClient() {
     }
   };
 
-  const canvasPoint = (event: React.MouseEvent<HTMLCanvasElement>): Point | null => {
+  const canvasPoint = (event: MouseEvent<HTMLCanvasElement>): Point | null => {
     const canvas = previewRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();

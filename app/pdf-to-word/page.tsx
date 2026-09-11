@@ -3,7 +3,7 @@ import { PdfToWordClient } from "./pdf-to-word-client";
 
 export const metadata = createPageMetadata(
   "PDF to Word",
-  "Extract text from a PDF into an editable Word document with PDF Guru.",
+  "Convert PDFs into an editable Word document with layout, tables, and OCR using PDF Guru.",
   "/pdf-to-word"
 );
 

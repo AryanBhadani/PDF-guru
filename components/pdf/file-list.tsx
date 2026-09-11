@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, FileText, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatFileSize } from "@/lib/utils";
+import { useT } from "@/components/i18n/language-provider";
 
 export type ListedFile = {
   id: string;
@@ -20,15 +21,18 @@ type FileListProps = {
 };
 
 export function FileList({ files, onMove, onRemove, onClear, disabled }: FileListProps) {
+  const t = useT();
   if (files.length === 0) return null;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">{files.length} file{files.length === 1 ? "" : "s"}</p>
+        <p className="text-sm font-medium">
+          {files.length} {t("common.files")}
+        </p>
         <Button variant="ghost" size="sm" onClick={onClear} disabled={disabled}>
           <X className="h-4 w-4" />
-          Clear all
+          {t("common.clearAll")}
         </Button>
       </div>
       <ul className="space-y-2">

@@ -12,8 +12,10 @@ import { SelectedFile } from "@/components/pdf/selected-file";
 import { PDF_MIME_TYPE } from "@/lib/constants";
 import { getPdfPageCount } from "@/lib/pdf";
 import { downloadBlob } from "@/lib/utils";
+import { useT } from "@/components/i18n/language-provider";
 
 export function PdfToPptClient() {
+  const t = useT();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -27,15 +29,15 @@ export function PdfToPptClient() {
       setFile(next);
       setPageCount(count);
       setProgress({ current: 0, total: 0 });
-      toast.success(`Loaded ${count} page${count === 1 ? "" : "s"}.`);
+      toast.success(t("upload.loadedPages", { count }));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.readPdf"));
     }
   };
 
   const convert = async () => {
     if (!file || loading) {
-      if (!file) toast.error("Upload a PDF first.");
+      if (!file) toast.error(t("errors.uploadPdfFirst"));
       return;
     }
     setLoading(true);
@@ -45,25 +47,22 @@ export function PdfToPptClient() {
       const blob = await convertPdfToPptx(file, (current, total) => setProgress({ current, total }));
       const name = file.name.replace(/\.pdf$/i, "") || "pdf-guru";
       downloadBlob(blob, `${name}.pptx`);
-      toast.success("PowerPoint ready.");
+      toast.success(t("success.pptReady"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not convert this PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.conversion"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PdfToolLayout
-      title="PDF to PPT"
-      description="Each PDF page becomes a PowerPoint slide. Conversion runs in your browser."
-    >
+    <PdfToolLayout title={t("tools.pdfToPpt.pageTitle")} description={t("tools.pdfToPpt.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
           accept="application/pdf,.pdf"
           multiple={false}
-          title="Drop a PDF here"
-          hint="One PDF · each page becomes a slide"
+          title={t("upload.dropPdf")}
+          hint={t("upload.hintOnePdf")}
           disabled={loading}
           allowedTypes={[PDF_MIME_TYPE]}
           onFiles={handleFiles}
@@ -71,15 +70,15 @@ export function PdfToPptClient() {
         {!file ? (
           <EmptyState
             icon={<Presentation className="h-8 w-8" />}
-            title="No PDF selected"
-            hint="Upload a document to create a PowerPoint file."
+            title={t("tools.pdfToPpt.emptyTitle")}
+            hint={t("tools.pdfToPpt.emptyHint")}
           />
         ) : (
           <>
             <SelectedFile
               name={file.name}
               size={file.size}
-              extra={`${pageCount} page${pageCount === 1 ? "" : "s"}`}
+              extra={`${pageCount} ${t("common.pages")}`}
               disabled={loading}
               onClear={() => {
                 setFile(null);
@@ -87,11 +86,11 @@ export function PdfToPptClient() {
               }}
             />
             {loading && (
-              <ProgressBar current={progress.current} total={progress.total} label="Creating slides" />
+              <ProgressBar current={progress.current} total={progress.total} label={t("tools.pdfToPpt.progress")} />
             )}
             <DownloadButton
-              label="Convert to PPTX"
-              loadingLabel="Creating PowerPoint…"
+              label={t("tools.pdfToPpt.convert")}
+              loadingLabel={t("tools.pdfToPpt.converting")}
               loading={loading}
               onClick={convert}
             />

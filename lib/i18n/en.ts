@@ -143,6 +143,11 @@ export const en = {
       emptyHint: "Add photos to build your PDF.",
       convert: "Convert to PDF",
       converting: "Creating PDF…",
+      quality: "Quality",
+      qualityLow: "Low",
+      qualityMedium: "Medium",
+      qualityHigh: "High",
+      qualityOriginal: "Original",
     },
     mergePdf: {
       title: "Merge PDF",
@@ -321,16 +326,30 @@ export const en = {
     pdfToWord: {
       title: "PDF to Word",
       nav: "PDF to Word",
-      desc: "Extract text from a PDF into an editable Word document.",
+      desc: "Convert PDFs into an editable Word document with layout, tables, and OCR.",
       pageTitle: "PDF to Word",
-      pageDesc: "Extract selectable text into a .docx file. Scanned PDFs need OCR, which is not included yet.",
+      pageDesc: "Rebuild text, tables, and images into an editable .docx. Scanned pages use OCR. Layout matching is best-effort.",
       emptyTitle: "No PDF selected",
-      emptyHint: "Upload a text PDF to create a Word file.",
+      emptyHint: "Upload a PDF to create a Word file.",
       convert: "Download Word",
-      converting: "Extracting text…",
+      converting: "Building Word file…",
       ocrWarning:
-        "This PDF has little or no selectable text. It may be scanned. OCR is not available in this version.",
+        "This PDF had little selectable text, so OCR was used. Review the Word file before sharing.",
       chars: "{count} characters extracted from {pages} page(s).",
+    },
+    screenshotToWord: {
+      title: "Screenshot to Word",
+      nav: "Screenshot to Word",
+      desc: "Turn screenshots into an editable Word document with OCR and tables.",
+      pageTitle: "Screenshot to Word",
+      pageDesc: "Upload screenshots. OCR rebuilds text, tables, and logos into an editable Word file. Matching is best-effort.",
+      emptyTitle: "No screenshots yet",
+      emptyHint: "Add PNG, JPG, or WEBP screenshots.",
+      drop: "Drop screenshots here",
+      convert: "Download Word",
+      converting: "Reading screenshots…",
+      summary: "{chars} characters from {pages} screenshot(s). Tables found: {tables}.",
+      disclaimer: "Text and tables are editable. Layout, colors, and fonts are approximate.",
     },
     pdfToExcel: {
       title: "PDF to Excel",
@@ -399,12 +418,6 @@ export const en = {
       itemGst: "Item {n} GST % must be between 0 and 28.",
     },
   },
-} as const;
-
-type DeepStringify<T> = {
-  [K in keyof T]: T[K] extends object
-  ? DeepStringify<T[K]>
-  : string;
 };
 
-export type Messages = DeepStringify<typeof en>;
+export type Messages = typeof en;

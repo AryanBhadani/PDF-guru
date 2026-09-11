@@ -20,6 +20,7 @@ import {
 } from "@/lib/gst";
 import { downloadBlob, todayIsoDate } from "@/lib/utils";
 import type { InvoiceFormData } from "@/types/invoice";
+import { useT } from "@/components/i18n/language-provider";
 
 const initialData: InvoiceFormData = {
   seller: emptyParty(),
@@ -32,6 +33,7 @@ const initialData: InvoiceFormData = {
 };
 
 export function GstInvoiceClient() {
+  const t = useT();
   const [data, setData] = useState<InvoiceFormData>(initialData);
   const [loading, setLoading] = useState(false);
   const totals = useMemo(() => calculateInvoice(data), [data]);
@@ -39,26 +41,23 @@ export function GstInvoiceClient() {
   const generate = () => {
     const error = validateInvoice(data);
     if (error) {
-      toast.error(error);
+      toast.error(t(error.key, error.vars));
       return;
     }
     setLoading(true);
     try {
       const blob = generateInvoicePdf(data);
       downloadBlob(blob, `pdf-guru-invoice-${data.meta.invoiceNumber}.pdf`);
-      toast.success("Invoice PDF ready.");
+      toast.success(t("success.invoiceReady"));
     } catch {
-      toast.error("Could not generate the invoice PDF.");
+      toast.error(t("errors.processing"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PdfToolLayout
-      title="GST Invoice Generator"
-      description="Fill seller, buyer, and items. PDF Guru calculates GST and builds a professional invoice."
-    >
+    <PdfToolLayout title={t("tools.gstInvoice.pageTitle")} description={t("tools.gstInvoice.pageDesc")}>
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
@@ -75,11 +74,11 @@ export function GstInvoiceClient() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Invoice</CardTitle>
+              <CardTitle>{t("tools.gstInvoice.invoice")}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="invoice-number">Invoice number</Label>
+                <Label htmlFor="invoice-number">{t("tools.gstInvoice.invoiceNumber")}</Label>
                 <Input
                   id="invoice-number"
                   value={data.meta.invoiceNumber}
@@ -93,7 +92,7 @@ export function GstInvoiceClient() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="invoice-date">Date</Label>
+                <Label htmlFor="invoice-date">{t("tools.gstInvoice.date")}</Label>
                 <Input
                   id="invoice-date"
                   type="date"
@@ -116,8 +115,8 @@ export function GstInvoiceClient() {
             onAdd={() => setData((current) => ({ ...current, items: [...current.items, createEmptyItem()] }))}
           />
           <DownloadButton
-            label="Download invoice PDF"
-            loadingLabel="Creating invoice…"
+            label={t("tools.gstInvoice.download")}
+            loadingLabel={t("tools.gstInvoice.creating")}
             loading={loading}
             onClick={generate}
           />

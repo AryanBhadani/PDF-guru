@@ -7,17 +7,11 @@ import { LanguageProvider } from "@/components/i18n/language-provider";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <LanguageProvider>
         {children}
+        <Toaster richColors position="top-right" closeButton />
       </LanguageProvider>
-
-      <Toaster richColors position="top-right" closeButton />
     </ThemeProvider>
   );
 }

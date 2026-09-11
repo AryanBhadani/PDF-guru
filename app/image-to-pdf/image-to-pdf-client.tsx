@@ -26,6 +26,7 @@ import type {
   PageOrientation,
   PageSizeName,
 } from "@/types/conversion";
+import { useT } from "@/components/i18n/language-provider";
 
 const defaultOptions: ImageToPdfOptions = {
   pageSize: "a4",
@@ -41,6 +42,7 @@ const defaultOptions: ImageToPdfOptions = {
 };
 
 export function ImageToPdfClient() {
+  const t = useT();
   const { items, add, remove, clear, move } = useFileQueue<ImageFileItem>();
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<ImageToPdfOptions>(defaultOptions);
@@ -72,7 +74,7 @@ export function ImageToPdfClient() {
 
   const handleFiles = (files: File[]) => {
     if (items.length + files.length > MAX_IMAGE_COUNT) {
-      toast.error(`You can add up to ${MAX_IMAGE_COUNT} images.`);
+      toast.error(t("upload.maxImages", { count: MAX_IMAGE_COUNT }));
       return;
     }
     add(
@@ -84,7 +86,7 @@ export function ImageToPdfClient() {
         previewUrl: URL.createObjectURL(file),
       }))
     );
-    toast.success(`${files.length} image${files.length === 1 ? "" : "s"} added.`);
+    toast.success(t("upload.addedImages", { count: files.length }));
   };
 
   const handleClear = () => {
@@ -100,7 +102,7 @@ export function ImageToPdfClient() {
 
   const convert = async () => {
     if (items.length === 0 || loading) {
-      if (items.length === 0) toast.error("Upload at least one image.");
+      if (items.length === 0) toast.error(t("errors.uploadImageFirst"));
       return;
     }
     if (options.pageSize === "custom" && (options.customWidthMm < 50 || options.customHeightMm < 50)) {
@@ -115,9 +117,9 @@ export function ImageToPdfClient() {
         options
       );
       downloadPdf(bytes, "pdf-guru-images.pdf");
-      toast.success("PDF ready.");
+      toast.success(t("success.ready"));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create the PDF.");
+      toast.error(error instanceof Error ? error.message : t("errors.conversion"));
     } finally {
       setLoading(false);
     }
@@ -126,16 +128,13 @@ export function ImageToPdfClient() {
   const patch = (partial: Partial<ImageToPdfOptions>) => setOptions((current) => ({ ...current, ...partial }));
 
   return (
-    <PdfToolLayout
-      title="Image to PDF"
-      description="Advanced photo to PDF with page size, orientation, margins, quality, and page numbers."
-    >
+    <PdfToolLayout title={t("tools.imageToPdf.pageTitle")} description={t("tools.imageToPdf.pageDesc")}>
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
           <FileUpload
             accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-            title="Drop images here"
-            hint="JPG, PNG, or WEBP · reorder before converting"
+            title={t("upload.dropImages")}
+            hint={t("upload.hintImages")}
             disabled={loading}
             allowedTypes={IMAGE_MIME_TYPES}
             onFiles={handleFiles}
@@ -143,18 +142,18 @@ export function ImageToPdfClient() {
           {items.length === 0 ? (
             <EmptyState
               icon={<FileImage className="h-8 w-8" />}
-              title="No images yet"
-              hint="Add photos, then customize the PDF layout."
+              title={t("tools.imageToPdf.emptyTitle")}
+              hint={t("tools.imageToPdf.emptyHint")}
             />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">
-                  {items.length} image{items.length === 1 ? "" : "s"}
+                  {items.length} {t("common.images")}
                 </p>
                 <Button variant="ghost" size="sm" onClick={handleClear} disabled={loading}>
                   <X className="h-4 w-4" />
-                  Clear all
+                  {t("common.clearAll")}
                 </Button>
               </div>
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -187,8 +186,8 @@ export function ImageToPdfClient() {
             </div>
           )}
           <DownloadButton
-            label="Create PDF"
-            loadingLabel="Creating PDF…"
+            label={t("tools.imageToPdf.convert")}
+            loadingLabel={t("tools.imageToPdf.converting")}
             loading={loading}
             disabled={items.length === 0}
             onClick={convert}
@@ -196,7 +195,7 @@ export function ImageToPdfClient() {
         </div>
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle>Layout</CardTitle>
+            <CardTitle>{t("tools.imageToPdf.layout")}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">

@@ -1,30 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Images, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ScanText, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PdfToolLayout } from "@/components/pdf/pdf-tool-layout";
 import { FileUpload } from "@/components/pdf/file-upload";
 import { DownloadButton } from "@/components/pdf/download-button";
 import { EmptyState } from "@/components/pdf/empty-state";
+import { ProgressBar } from "@/components/pdf/progress-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/select";
 import { IMAGE_MIME_TYPES, MAX_IMAGE_COUNT } from "@/lib/constants";
-import { imagesToPdf } from "@/lib/image";
-import { downloadPdf } from "@/lib/pdf";
-import { createId } from "@/lib/utils";
+import { downloadBlob, createId } from "@/lib/utils";
 import { useFileQueue } from "@/hooks/use-file-queue";
 import type { ImageFileItem } from "@/types/pdf";
-import type { PhotoPdfQuality } from "@/types/conversion";
 import { useT } from "@/components/i18n/language-provider";
+import type { ScreenshotToWordResult } from "@/lib/screenshot-to-word";
 
-export function PhotoToPdfClient() {
+export function ScreenshotToWordClient() {
   const t = useT();
   const { items, add, remove, clear, move } = useFileQueue<ImageFileItem>();
   const [loading, setLoading] = useState(false);
-  const [quality, setQuality] = useState<PhotoPdfQuality>("medium");
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [result, setResult] = useState<ScreenshotToWordResult | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
 
@@ -48,18 +46,21 @@ export function PhotoToPdfClient() {
         previewUrl: URL.createObjectURL(file),
       }))
     );
+    setResult(null);
     toast.success(t("upload.addedImages", { count: files.length }));
   };
 
   const handleClear = () => {
     items.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     clear();
+    setResult(null);
   };
 
   const handleRemove = (id: string) => {
     const item = items.find((row) => row.id === id);
     if (item) URL.revokeObjectURL(item.previewUrl);
     remove(id);
+    setResult(null);
   };
 
   const convert = async () => {
@@ -68,10 +69,15 @@ export function PhotoToPdfClient() {
       return;
     }
     setLoading(true);
+    setProgress({ current: 0, total: items.length });
     try {
-      const bytes = await imagesToPdf(items.map((item) => item.file), { quality });
-      downloadPdf(bytes, "pdf-guru-photos.pdf");
-      toast.success(t("success.ready"));
+      const { convertScreenshotsToDocx } = await import("@/lib/screenshot-to-word");
+      const next = await convertScreenshotsToDocx(items.map((item) => item.file), (current, total) => {
+        setProgress({ current, total });
+      });
+      setResult(next);
+      downloadBlob(next.blob, "pdf-guru-screenshot.docx");
+      toast.success(t("success.wordReady"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("errors.conversion"));
     } finally {
@@ -80,11 +86,11 @@ export function PhotoToPdfClient() {
   };
 
   return (
-    <PdfToolLayout title={t("tools.photoToPdf.pageTitle")} description={t("tools.photoToPdf.pageDesc")}>
+    <PdfToolLayout title={t("tools.screenshotToWord.pageTitle")} description={t("tools.screenshotToWord.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
           accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-          title={t("upload.dropImages")}
+          title={t("tools.screenshotToWord.drop")}
           hint={t("upload.hintImages")}
           disabled={loading}
           allowedTypes={IMAGE_MIME_TYPES}
@@ -93,9 +99,9 @@ export function PhotoToPdfClient() {
 
         {items.length === 0 ? (
           <EmptyState
-            icon={<Images className="h-8 w-8" />}
-            title={t("tools.photoToPdf.emptyTitle")}
-            hint={t("tools.photoToPdf.emptyHint")}
+            icon={<ScanText className="h-8 w-8" />}
+            title={t("tools.screenshotToWord.emptyTitle")}
+            hint={t("tools.screenshotToWord.emptyHint")}
           />
         ) : (
           <div className="space-y-3">
@@ -135,28 +141,29 @@ export function PhotoToPdfClient() {
                 </li>
               ))}
             </ul>
-            <Card>
-              <CardContent className="grid gap-2 p-4 sm:max-w-xs">
-                <Label htmlFor="photo-quality">{t("tools.photoToPdf.quality")}</Label>
-                <NativeSelect
-                  id="photo-quality"
-                  value={quality}
-                  disabled={loading}
-                  onChange={(event) => setQuality(event.target.value as PhotoPdfQuality)}
-                >
-                  <option value="low">{t("tools.photoToPdf.qualityLow")}</option>
-                  <option value="medium">{t("tools.photoToPdf.qualityMedium")}</option>
-                  <option value="high">{t("tools.photoToPdf.qualityHigh")}</option>
-                  <option value="original">{t("tools.photoToPdf.qualityOriginal")}</option>
-                </NativeSelect>
-              </CardContent>
-            </Card>
+            {loading && (
+              <ProgressBar current={progress.current} total={progress.total || items.length} label={t("tools.screenshotToWord.converting")} />
+            )}
+            {result && (
+              <Card>
+                <CardContent className="space-y-2 p-6 text-sm text-muted-foreground">
+                  <p>
+                    {t("tools.screenshotToWord.summary", {
+                      pages: result.pageCount,
+                      chars: result.charCount,
+                      tables: result.tableCount,
+                    })}
+                  </p>
+                  <p>{t("tools.screenshotToWord.disclaimer")}</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
         <DownloadButton
-          label={t("tools.photoToPdf.convert")}
-          loadingLabel={t("tools.photoToPdf.converting")}
+          label={t("tools.screenshotToWord.convert")}
+          loadingLabel={t("tools.screenshotToWord.converting")}
           loading={loading}
           disabled={items.length === 0}
           onClick={convert}
