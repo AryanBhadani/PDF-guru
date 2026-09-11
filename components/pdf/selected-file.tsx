@@ -5,6 +5,7 @@ import { formatFileSize } from "@/lib/utils";
 type SelectedFileProps = {
   name: string;
   size: number;
+  pageCount?: number;
   extra?: string;
   onClear?: () => void;
   disabled?: boolean;
