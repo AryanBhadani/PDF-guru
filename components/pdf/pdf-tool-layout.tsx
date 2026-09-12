@@ -8,8 +8,8 @@ type PdfToolLayoutProps = {
 
 export function PdfToolLayout({ title, description, children }: PdfToolLayoutProps) {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:py-12">
-      <div className="mb-8 max-w-2xl animate-fade-in">
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:py-12">
+      <div className="mb-6 max-w-2xl animate-fade-in sm:mb-8">
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-2 text-muted-foreground">{description}</p>
       </div>

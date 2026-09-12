@@ -29,12 +29,12 @@ import type {
 import { useT } from "@/components/i18n/language-provider";
 
 const defaultOptions: ImageToPdfOptions = {
-  pageSize: "a4",
+  pageSize: "original",
   orientation: "portrait",
   customWidthMm: 210,
   customHeightMm: 297,
-  margin: "medium",
-  customMarginMm: 12,
+  margin: "none",
+  customMarginMm: 0,
   fit: "fit",
   quality: "high",
   background: "#ffffff",

@@ -320,12 +320,7 @@ export async function cleanedImageToPdf(canvas: HTMLCanvasElement): Promise<Uint
   const jpeg = await canvasToJpeg(canvas);
   const pdf = await PDFDocument.create();
   const image = await pdf.embedJpg(jpeg);
-  const maxWidth = 595.28;
-  const maxHeight = 841.89;
-  const ratio = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
-  const width = image.width * ratio;
-  const height = image.height * ratio;
-  const page = pdf.addPage([width, height]);
-  page.drawImage(image, { x: 0, y: 0, width, height });
+  const page = pdf.addPage([image.width, image.height]);
+  page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
   return pdf.save({ useObjectStreams: false });
 }

@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { ImageToPdfOptions } from "@/types/conversion";
+import { decodeImageSource } from "./image";
 
 const MM_TO_PT = 2.834645669;
 
@@ -36,17 +37,19 @@ function hexToRgb(hex: string) {
 }
 
 async function prepareImageBytes(file: File, quality: number): Promise<{ bytes: Uint8Array; width: number; height: number; kind: "jpg" | "png" }> {
-  const bitmap = await createImageBitmap(file);
+  const decoded = await decodeImageSource(file);
   const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  canvas.width = decoded.width;
+  canvas.height = decoded.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
+    decoded.cleanup();
     throw new Error(`Could not read image "${file.name}".`);
   }
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0);
+  ctx.drawImage(decoded.source, 0, 0);
+  decoded.cleanup();
   const usePng = file.type === "image/png" && quality >= 0.9;
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
@@ -118,31 +121,13 @@ export async function createAdvancedImagePdf(files: File[], options: ImageToPdfO
     let drawWidth = boxWidth;
     let drawHeight = boxHeight;
 
-    if (options.fit === "fit" || options.fit === "original") {
-      if (imageRatio > boxRatio) {
-        drawWidth = boxWidth;
-        drawHeight = boxWidth / imageRatio;
-      } else {
-        drawHeight = boxHeight;
-        drawWidth = boxHeight * imageRatio;
-      }
-      if (options.fit === "original") {
-        const scale = 72 / 96;
-        const naturalW = image.width * scale;
-        const naturalH = image.height * scale;
-        if (naturalW <= boxWidth && naturalH <= boxHeight) {
-          drawWidth = naturalW;
-          drawHeight = naturalH;
-        }
-      }
+    // Preserve complete image, never crop, preserve original aspect ratio
+    if (imageRatio > boxRatio) {
+      drawWidth = boxWidth;
+      drawHeight = boxWidth / imageRatio;
     } else {
-      if (imageRatio > boxRatio) {
-        drawHeight = boxHeight;
-        drawWidth = boxHeight * imageRatio;
-      } else {
-        drawWidth = boxWidth;
-        drawHeight = boxWidth / imageRatio;
-      }
+      drawHeight = boxHeight;
+      drawWidth = boxHeight * imageRatio;
     }
 
     const x = margin + (boxWidth - drawWidth) / 2;
