@@ -18,8 +18,13 @@ export async function compressPdf(
   const settings = LEVEL_SETTINGS[level];
 
   const rebuilt = await rebuildFromRenderedPages(file, settings.scale, settings.quality, onProgress);
-  const fallback = await recompressWithPdfLib(file);
-  const chosen = rebuilt.byteLength <= fallback.byteLength ? rebuilt : fallback;
+  let fallback: Uint8Array | null = null;
+  try {
+    fallback = await recompressWithPdfLib(file);
+  } catch {
+    // pdf-lib fallback could not load the document directly, proceed with rebuilt pages
+  }
+  const chosen = fallback && fallback.byteLength < rebuilt.byteLength ? fallback : rebuilt;
   const compressedSize = chosen.byteLength;
   const reductionPercent =
     originalSize === 0 ? 0 : Math.max(0, Math.round(((originalSize - compressedSize) / originalSize) * 100));
@@ -35,7 +40,7 @@ export async function compressPdf(
 
 async function recompressWithPdfLib(file: File): Promise<Uint8Array> {
   const pdf = await loadPdf(file);
-  return pdf.save({ useObjectStreams: true, addDefaultPage: false });
+  return pdf.save({ useObjectStreams: false, addDefaultPage: false });
 }
 
 async function rebuildFromRenderedPages(
@@ -69,5 +74,5 @@ async function rebuildFromRenderedPages(
   }
 
   await source.destroy();
-  return output.save({ useObjectStreams: true });
+  return output.save({ useObjectStreams: false });
 }

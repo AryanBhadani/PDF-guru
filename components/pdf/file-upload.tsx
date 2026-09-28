@@ -5,6 +5,7 @@ import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MAX_FILE_SIZE_BYTES } from "@/lib/constants";
+import { isAllowedFile } from "@/lib/file-type";
 import { useT } from "@/components/i18n/language-provider";
 
 type FileUploadProps = {
@@ -17,24 +18,6 @@ type FileUploadProps = {
   maxSize?: number;
   allowedTypes?: string[];
 };
-
-function isAllowed(file: File, allowedTypes?: string[]): boolean {
-  if (!allowedTypes || allowedTypes.length === 0) return true;
-  const name = file.name.toLowerCase();
-  const type = file.type.toLowerCase();
-
-  return allowedTypes.some((allowed) => {
-    const normalized = allowed.toLowerCase();
-    if (type && type === normalized) return true;
-    if (normalized === "image/jpeg" && (type === "image/jpg" || name.endsWith(".jpg") || name.endsWith(".jpeg"))) {
-      return true;
-    }
-    if (normalized === "image/png" && name.endsWith(".png")) return true;
-    if (normalized === "image/webp" && name.endsWith(".webp")) return true;
-    if (normalized === "application/pdf" && name.endsWith(".pdf")) return true;
-    return false;
-  });
-}
 
 export function FileUpload({
   accept,
@@ -51,24 +34,32 @@ export function FileUpload({
   const [dragging, setDragging] = useState(false);
 
   const handleFiles = useCallback(
-    (list: FileList | File[]) => {
+    async (list: FileList | File[]) => {
       const incoming = Array.from(list);
       if (incoming.length === 0) return;
 
       const valid: File[] = [];
       for (const file of incoming) {
-        if (!isAllowed(file, allowedTypes)) {
-          toast.error(t("upload.unsupported", { name: file.name }));
-          continue;
-        }
         if (file.size > maxSize) {
-          toast.error(t("upload.tooLarge", { name: file.name, mb: Math.round(maxSize / (1024 * 1024)) }));
+          toast.error(
+            t("upload.tooLarge", {
+              name: file.name,
+              mb: Math.round(maxSize / (1024 * 1024)),
+            })
+          );
           continue;
         }
         if (file.size === 0) {
           toast.error(t("upload.empty", { name: file.name }));
           continue;
         }
+
+        const allowed = await isAllowedFile(file, allowedTypes);
+        if (!allowed) {
+          toast.error(t("upload.unsupported", { name: file.name }));
+          continue;
+        }
+
         valid.push(file);
       }
 
@@ -96,7 +87,7 @@ export function FileUpload({
       onDrop={(event) => {
         event.preventDefault();
         setDragging(false);
-        if (!disabled) handleFiles(event.dataTransfer.files);
+        if (!disabled) void handleFiles(event.dataTransfer.files);
       }}
       className={cn(
         "flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors",
@@ -115,7 +106,7 @@ export function FileUpload({
         className="hidden"
         disabled={disabled}
         onChange={(event) => {
-          if (event.target.files) handleFiles(event.target.files);
+          if (event.target.files) void handleFiles(event.target.files);
           event.target.value = "";
         }}
       />

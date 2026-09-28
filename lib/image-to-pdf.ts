@@ -1,6 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import type { ImageToPdfOptions } from "@/types/conversion";
-import { decodeImageSource } from "./image";
+import { canvasToJpeg, imageToCanvas } from "./image";
 
 const MM_TO_PT = 2.834645669;
 
@@ -37,36 +37,32 @@ function hexToRgb(hex: string) {
 }
 
 async function prepareImageBytes(file: File, quality: number): Promise<{ bytes: Uint8Array; width: number; height: number; kind: "jpg" | "png" }> {
-  const decoded = await decodeImageSource(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = decoded.width;
-  canvas.height = decoded.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    decoded.cleanup();
-    throw new Error(`Could not read image "${file.name}".`);
-  }
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(decoded.source, 0, 0);
-  decoded.cleanup();
+  const canvas = await imageToCanvas(file);
   const usePng = file.type === "image/png" && quality >= 0.9;
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (result) => {
-        if (result) resolve(result);
-        else reject(new Error(`Could not process "${file.name}".`));
-      },
-      usePng ? "image/png" : "image/jpeg",
-      quality
-    );
-  });
-  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let bytes: Uint8Array;
+  let kind: "jpg" | "png" = "jpg";
+
+  if (usePng) {
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob && blob.size > 0) {
+        bytes = new Uint8Array(await blob.arrayBuffer());
+        kind = "png";
+      } else {
+        bytes = await canvasToJpeg(canvas, quality);
+      }
+    } catch {
+      bytes = await canvasToJpeg(canvas, quality);
+    }
+  } else {
+    bytes = await canvasToJpeg(canvas, quality);
+  }
+
   const width = canvas.width;
   const height = canvas.height;
   canvas.width = 0;
   canvas.height = 0;
-  return { bytes, width, height, kind: usePng ? "png" : "jpg" };
+  return { bytes, width, height, kind };
 }
 
 function pageDimensions(options: ImageToPdfOptions, imageWidth: number, imageHeight: number): [number, number] {

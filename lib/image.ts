@@ -1,5 +1,9 @@
 import { PDFDocument } from "pdf-lib";
 import type { PhotoPdfOptions, PhotoPdfQuality } from "@/types/conversion";
+import {
+  detectFileSignature,
+  parseImageDimensionsFromBytes,
+} from "./file-type";
 
 const QUALITY_PRESET: Record<PhotoPdfQuality, { jpeg: number; maxDimension: number | null }> = {
   low: { jpeg: 0.58, maxDimension: 1280 },
@@ -23,47 +27,40 @@ type PreparedPhoto = {
 };
 
 export function detectImageMime(buffer: ArrayBuffer, fallbackType: string, filename: string): string {
-  const bytes = new Uint8Array(buffer.slice(0, 16));
-  // JPEG magic bytes: FF D8 FF
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
-  // PNG magic bytes: 89 50 4E 47
-  if (bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-    return "image/png";
-  }
-  // WEBP magic bytes: RIFF .... WEBP
-  if (
-    bytes.length >= 12 &&
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return "image/webp";
-  }
+  const sig = detectFileSignature(buffer);
+  if (sig.kind === "jpeg") return "image/jpeg";
+  if (sig.kind === "png") return "image/png";
+  if (sig.kind === "webp") return "image/webp";
+  if (sig.kind === "heic") return sig.mime;
+  if (sig.kind === "gif") return "image/gif";
+  if (sig.kind === "bmp") return "image/bmp";
 
   const lower = filename.toLowerCase();
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".jfif")) return "image/jpeg";
   if (lower.endsWith(".png")) return "image/png";
   if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".heic") || lower.endsWith(".heif")) return "image/heic";
 
   return fallbackType || "image/jpeg";
 }
 
 /**
- * Resilient image decoder handling mobile Chrome, Android content streams,
- * large camera captures, EXIF orientation, and format quirks.
+ * Resilient image decoder following the required 4-tier fallback order:
+ * 1. createImageBitmap (with EXIF orientation fallback to normal)
+ * 2. Object URL + HTMLImageElement (with byte-signature corrected MIME Blob)
+ * 3. FileReader / Data URL + HTMLImageElement
+ * 4. Byte/signature detection as last resort with informative error messages
  */
-export async function decodeImageSource(file: File): Promise<DecodedImageSource> {
-  // Method 1: direct createImageBitmap with EXIF orientation
+export async function decodeImageSource(fileOrBlob: File | Blob): Promise<DecodedImageSource> {
+  const fileName = "name" in fileOrBlob ? (fileOrBlob as File).name : "image";
+
+  // Tier 1: createImageBitmap
   if (typeof createImageBitmap !== "undefined") {
+    // 1a: Try with EXIF orientation
     try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" } as ImageBitmapOptions);
+      const bitmap = await createImageBitmap(fileOrBlob, {
+        imageOrientation: "from-image",
+      } as ImageBitmapOptions);
       if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
         return {
           source: bitmap,
@@ -73,25 +70,42 @@ export async function decodeImageSource(file: File): Promise<DecodedImageSource>
         };
       }
     } catch {
-      // Fall through to memory buffer / HTMLImageElement
+      // 1b: Try without imageOrientation option (some mobile WebViews reject the options object)
+      try {
+        const bitmap = await createImageBitmap(fileOrBlob);
+        if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+          return {
+            source: bitmap,
+            width: bitmap.width,
+            height: bitmap.height,
+            cleanup: () => bitmap.close?.(),
+          };
+        }
+      } catch {
+        // Proceed to Tier 2
+      }
     }
   }
 
-  // Method 2: read ArrayBuffer to bypass Android ContentProvider streaming locks
+  // Read array buffer to handle Android ContentProvider streams and detect real MIME
   let buffer: ArrayBuffer;
   try {
-    buffer = await file.arrayBuffer();
+    buffer = await fileOrBlob.arrayBuffer();
   } catch {
-    throw new Error(`Could not read file "${file.name}".`);
+    throw new Error(`Could not read file "${fileName}".`);
   }
 
-  const mime = detectImageMime(buffer, file.type, file.name);
-  const blob = new Blob([buffer], { type: mime });
+  const sig = detectFileSignature(buffer);
+  const detectedMime = sig.kind !== "unknown" ? sig.mime : detectImageMime(buffer, fileOrBlob.type, fileName);
+  // Ensure typed blob so browsers won't reject decoding generic application/octet-stream
+  const typedBlob = fileOrBlob.type === detectedMime ? fileOrBlob : new Blob([buffer], { type: detectedMime });
 
-  // Method 2b: createImageBitmap on clean in-memory Blob
+  // Tier 1b (retry on clean in-memory Typed Blob if original File had streaming locks)
   if (typeof createImageBitmap !== "undefined") {
     try {
-      const bitmap = await createImageBitmap(blob, { imageOrientation: "from-image" } as ImageBitmapOptions);
+      const bitmap = await createImageBitmap(typedBlob, {
+        imageOrientation: "from-image",
+      } as ImageBitmapOptions);
       if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
         return {
           source: bitmap,
@@ -101,15 +115,26 @@ export async function decodeImageSource(file: File): Promise<DecodedImageSource>
         };
       }
     } catch {
-      // Fall through to HTMLImageElement
+      try {
+        const bitmap = await createImageBitmap(typedBlob);
+        if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+          return {
+            source: bitmap,
+            width: bitmap.width,
+            height: bitmap.height,
+            cleanup: () => bitmap.close?.(),
+          };
+        }
+      } catch {
+        // Proceed to Tier 2
+      }
     }
   }
 
-  // Method 3: HTMLImageElement via object URL (bulletproof on mobile Chrome/Safari with EXIF)
+  // Tier 2: Object URL + Image (bulletproof on mobile Chrome/Safari with CSS EXIF default)
   try {
-    const objectUrl = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(typedBlob);
     const img = new Image();
-    img.decoding = "async";
 
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
@@ -121,7 +146,7 @@ export async function decodeImageSource(file: File): Promise<DecodedImageSource>
       try {
         await img.decode();
       } catch {
-        // img.decode() can reject on some devices even if onload completed; proceed
+        // img.decode() can reject on some mobile engines even if onload finished; ignore
       }
     }
 
@@ -138,16 +163,16 @@ export async function decodeImageSource(file: File): Promise<DecodedImageSource>
     }
     URL.revokeObjectURL(objectUrl);
   } catch {
-    // Fall through to FileReader Data URL
+    // Proceed to Tier 3
   }
 
-  // Method 4: FileReader readAsDataURL fallback
+  // Tier 3: FileReader / Data URL
   try {
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error("FileReader failed."));
-      reader.readAsDataURL(blob);
+      reader.readAsDataURL(typedBlob);
     });
 
     const img = new Image();
@@ -169,13 +194,32 @@ export async function decodeImageSource(file: File): Promise<DecodedImageSource>
       };
     }
   } catch {
-    // All methods exhausted
+    // Proceed to Tier 4
   }
 
-  throw new Error(`Could not decode image "${file.name}". The format may be unsupported or corrupted.`);
+  // Tier 4: Byte/signature detection as last resort with informative error messages
+  if (sig.kind === "heic") {
+    throw new Error(
+      `"${fileName}" is in HEIC/HEIF format, which is not supported by this browser. Please use JPG or PNG, or convert it first.`
+    );
+  }
+  if (sig.kind === "pdf") {
+    throw new Error(`"${fileName}" is a PDF document, not an image file.`);
+  }
+
+  const dims = parseImageDimensionsFromBytes(buffer);
+  if (dims && dims.width > 0 && dims.height > 0) {
+    throw new Error(`Could not decode image "${fileName}". The image data may be corrupted or truncated.`);
+  }
+
+  throw new Error(`Could not decode "${fileName}". Please try another image.`);
 }
 
-export async function validateImageFile(file: File): Promise<{ valid: boolean; error?: string }> {
+/**
+ * Validates that an image file can be decoded properly.
+ */
+export async function validateImageFile(file: File | Blob): Promise<{ valid: boolean; error?: string }> {
+  const fileName = "name" in file ? (file as File).name : "image";
   try {
     const decoded = await decodeImageSource(file);
     decoded.cleanup();
@@ -183,12 +227,33 @@ export async function validateImageFile(file: File): Promise<{ valid: boolean; e
   } catch (err) {
     return {
       valid: false,
-      error: err instanceof Error ? err.message : `Could not decode image "${file.name}".`,
+      error: err instanceof Error ? err.message : `Could not decode "${fileName}". Please try another image.`,
     };
   }
 }
 
-async function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array> {
+/**
+ * Convert any image File or Blob to an HTMLCanvasElement with EXIF orientation and exact aspect ratio.
+ */
+export async function imageToCanvas(fileOrBlob: File | Blob): Promise<HTMLCanvasElement> {
+  const decoded = await decodeImageSource(fileOrBlob);
+  const canvas = document.createElement("canvas");
+  canvas.width = decoded.width;
+  canvas.height = decoded.height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    decoded.cleanup();
+    throw new Error("Could not initialize canvas context.");
+  }
+  ctx.drawImage(decoded.source, 0, 0, decoded.width, decoded.height);
+  decoded.cleanup();
+  return canvas;
+}
+
+/**
+ * Helper to convert canvas to JPEG Uint8Array.
+ */
+export async function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Uint8Array> {
   try {
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob((result) => resolve(result), "image/jpeg", quality);
@@ -212,6 +277,76 @@ async function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+/**
+ * Safely converts any image source (File, Blob, or Data URL) into JPG/PNG bytes
+ * that can be directly passed to `pdfDoc.embedJpg` or `pdfDoc.embedPng`.
+ */
+export async function imageToPdfEmbeddable(
+  source: File | Blob | string,
+  quality = 0.92
+): Promise<{ bytes: Uint8Array; format: "jpg" | "png"; width: number; height: number }> {
+  let fileOrBlob: File | Blob;
+
+  if (typeof source === "string") {
+    const comma = source.indexOf(",");
+    const meta = source.slice(0, comma);
+    const base64 = comma !== -1 ? source.slice(comma + 1) : source;
+    const isPng = meta.includes("image/png");
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+
+    if (isPng || meta.includes("image/jpeg") || meta.includes("image/jpg")) {
+      const sig = detectFileSignature(bytes);
+      if (sig.kind === "png") {
+        const dims = parseImageDimensionsFromBytes(bytes);
+        if (dims) return { bytes, format: "png", width: dims.width, height: dims.height };
+      } else if (sig.kind === "jpeg") {
+        const dims = parseImageDimensionsFromBytes(bytes);
+        if (dims) return { bytes, format: "jpg", width: dims.width, height: dims.height };
+      }
+    }
+    fileOrBlob = new Blob([bytes], { type: isPng ? "image/png" : "image/jpeg" });
+  } else {
+    fileOrBlob = source;
+  }
+
+  const canvas = await imageToCanvas(fileOrBlob);
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const isPng =
+    (fileOrBlob.type === "image/png" ||
+      ("name" in fileOrBlob && (fileOrBlob as File).name.toLowerCase().endsWith(".png"))) &&
+    quality >= 0.95;
+
+  let bytes: Uint8Array;
+  let format: "jpg" | "png" = "jpg";
+
+  if (isPng) {
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+      if (blob && blob.size > 0) {
+        bytes = new Uint8Array(await blob.arrayBuffer());
+        format = "png";
+      } else {
+        bytes = await canvasToJpeg(canvas, quality);
+      }
+    } catch {
+      bytes = await canvasToJpeg(canvas, quality);
+    }
+  } else {
+    bytes = await canvasToJpeg(canvas, quality);
+  }
+
+  canvas.width = 0;
+  canvas.height = 0;
+
+  return { bytes, format, width, height };
 }
 
 async function preparePhoto(file: File, quality: PhotoPdfQuality): Promise<PreparedPhoto> {

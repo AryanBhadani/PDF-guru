@@ -1,6 +1,8 @@
 import { PDFDocument, rgb } from "pdf-lib";
 import type { PDFPageProxy } from "pdfjs-dist";
 import { detectClosestFont, getPdfStandardFont } from "@/lib/fonts";
+import { sanitizePdfBytes } from "@/lib/file-type";
+import { imageToPdfEmbeddable } from "@/lib/image";
 
 export type EditorTool = "select" | "add-text" | "add-image" | "whiteout";
 
@@ -194,7 +196,8 @@ export async function applyPdfEdits(
   originalBytes: ArrayBuffer,
   edits: EditorDocEdits
 ): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.load(originalBytes, { ignoreEncryption: true });
+  const cleanBytes = sanitizePdfBytes(originalBytes);
+  const pdfDoc = await PDFDocument.load(cleanBytes, { ignoreEncryption: true });
 
   const pages = pdfDoc.getPages();
 
@@ -256,19 +259,12 @@ export async function applyPdfEdits(
       });
     }
 
-    // 4. Apply Added Images
+    // 4. Apply Added Images (converts WEBP, PNG, JPG, or Android images seamlessly)
     for (const imgItem of pageEdits.addedImages || []) {
       if (!imgItem.dataUrl) continue;
       try {
-        const isPng = imgItem.dataUrl.startsWith("data:image/png");
-        const comma = imgItem.dataUrl.indexOf(",");
-        const base64 = comma !== -1 ? imgItem.dataUrl.slice(comma + 1) : imgItem.dataUrl;
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
-        const embedded = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+        const { bytes, format } = await imageToPdfEmbeddable(imgItem.dataUrl);
+        const embedded = format === "png" ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
         page.drawImage(embedded, {
           x: imgItem.x,
           y: imgItem.y,

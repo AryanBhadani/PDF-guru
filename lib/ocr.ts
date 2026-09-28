@@ -1,4 +1,5 @@
 import type { ProgressCallback } from "@/types/conversion";
+import { imageToCanvas } from "@/lib/image";
 
 export type OcrBbox = {
   x0: number;
@@ -126,19 +127,7 @@ async function canvasFromInput(image: HTMLCanvasElement | File | Blob): Promise<
   if (image instanceof HTMLCanvasElement) {
     return { canvas: image, width: image.width, height: image.height };
   }
-  const bitmap = await createImageBitmap(image);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) {
-    bitmap.close?.();
-    throw new Error("Could not read this image for OCR.");
-  }
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close?.();
+  const canvas = await imageToCanvas(image);
   return { canvas, width: canvas.width, height: canvas.height };
 }
 

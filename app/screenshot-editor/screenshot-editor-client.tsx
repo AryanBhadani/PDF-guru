@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/pdf/empty-state";
 import { createId } from "@/lib/utils";
 import { downloadPdf } from "@/lib/pdf";
+import { imageToCanvas } from "@/lib/image";
 import { useT } from "@/components/i18n/language-provider";
 import {
   AddedScreenshotText,
@@ -105,41 +106,32 @@ export function ScreenshotEditorClient() {
     const newPages: ScreenshotPageData[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (!file.type.startsWith("image/")) continue;
-
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
-        img.onerror = reject;
-        img.src = dataUrl;
-      });
-
-      newPages.push({
-        id: createId(),
-        file,
-        name: file.name,
-        dataUrl,
-        width: dimensions.width,
-        height: dimensions.height,
-        ocrStatus: "idle",
-        ocrProgress: 0,
-        detectedTexts: [],
-        modifiedTexts: {},
-        deletedTextIds: [],
-        addedTexts: [],
-        whiteouts: [],
-      });
+      try {
+        const canvas = await imageToCanvas(file);
+        const dataUrl = canvas.toDataURL("image/png");
+        newPages.push({
+          id: createId(),
+          file,
+          name: file.name,
+          dataUrl,
+          width: canvas.width,
+          height: canvas.height,
+          ocrStatus: "idle",
+          ocrProgress: 0,
+          detectedTexts: [],
+          modifiedTexts: {},
+          deletedTextIds: [],
+          addedTexts: [],
+          whiteouts: [],
+        });
+        canvas.width = 0;
+        canvas.height = 0;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : `Could not load "${file.name}".`);
+      }
     }
 
     if (newPages.length === 0) {
-      toast.error("Please select valid image files (PNG, JPG, or WEBP).");
       return;
     }
 
@@ -493,7 +485,7 @@ export function ScreenshotEditorClient() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
+            accept="image/*,.png,.jpg,.jpeg,.webp,.heic,.heif,.jfif"
             multiple
             className="hidden"
             onChange={(e) => handleFilesSelected(e.target.files)}
@@ -532,7 +524,7 @@ export function ScreenshotEditorClient() {
       <input
         ref={addFileInputRef}
         type="file"
-        accept="image/png,image/jpeg,image/jpg,image/webp"
+        accept="image/*,.png,.jpg,.jpeg,.webp,.heic,.heif,.jfif"
         multiple
         className="hidden"
         onChange={(e) => handleFilesSelected(e.target.files)}

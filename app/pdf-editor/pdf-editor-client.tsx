@@ -28,6 +28,8 @@ import { NativeSelect } from "@/components/ui/select";
 import { EmptyState } from "@/components/pdf/empty-state";
 import { loadPdfJsDocument } from "@/lib/pdf-render";
 import { downloadPdf } from "@/lib/pdf";
+import { imageToCanvas } from "@/lib/image";
+import { isPdfFile } from "@/lib/file-type";
 import { createId } from "@/lib/utils";
 import {
   AddedImageItem,
@@ -98,6 +100,7 @@ export function PdfEditorClient() {
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const getPageEdits = useCallback(
@@ -124,6 +127,11 @@ export function PdfEditorClient() {
   const handlePdfUpload = async (incomingFile: File) => {
     setLoading(true);
     try {
+      if (!(await isPdfFile(incomingFile))) {
+        toast.error(t("errors.corruptPdf"));
+        setLoading(false);
+        return;
+      }
       const buffer = await incomingFile.arrayBuffer();
       const doc = await loadPdfJsDocument(incomingFile);
       setFile(incomingFile);
@@ -339,42 +347,41 @@ export function PdfEditorClient() {
   };
 
   // Add new image
-  const handleImageSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     const imgFile = files[0];
     event.target.value = "";
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        const aspect = img.width / (img.height || 1);
-        const targetWidth = Math.min(180, pageDimensions.width * 0.4);
-        const targetHeight = targetWidth / aspect;
+    try {
+      const canvas = await imageToCanvas(imgFile);
+      const dataUrl = canvas.toDataURL("image/png");
+      const aspect = canvas.width / (canvas.height || 1);
+      const targetWidth = Math.min(180, pageDimensions.width * 0.4);
+      const targetHeight = targetWidth / aspect;
 
-        const newItem: AddedImageItem = {
-          id: createId(),
-          dataUrl,
-          x: Math.max(20, (pageDimensions.width - targetWidth) / 2),
-          y: Math.max(20, (pageDimensions.height - targetHeight) / 2),
-          width: targetWidth,
-          height: targetHeight,
-        };
-
-        updateCurrentPageEdits((prev) => ({
-          ...prev,
-          addedImages: [...prev.addedImages, newItem],
-        }));
-
-        setSelectedAddedId(newItem.id);
-        setActiveTool("select");
-        toast.success("Image added");
+      const newItem: AddedImageItem = {
+        id: createId(),
+        dataUrl,
+        x: Math.max(20, (pageDimensions.width - targetWidth) / 2),
+        y: Math.max(20, (pageDimensions.height - targetHeight) / 2),
+        width: targetWidth,
+        height: targetHeight,
       };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(imgFile);
+
+      updateCurrentPageEdits((prev) => ({
+        ...prev,
+        addedImages: [...prev.addedImages, newItem],
+      }));
+
+      setSelectedAddedId(newItem.id);
+      setActiveTool("select");
+      toast.success("Image added");
+      canvas.width = 0;
+      canvas.height = 0;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add image.");
+    }
   };
 
   // Whiteout drawing handlers
@@ -547,9 +554,9 @@ export function PdfEditorClient() {
           <div
             role="button"
             tabIndex={0}
-            onClick={() => imageInputRef.current?.click()}
+            onClick={() => pdfInputRef.current?.click()}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") imageInputRef.current?.click();
+              if (e.key === "Enter" || e.key === " ") pdfInputRef.current?.click();
             }}
             className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:border-primary/50"
           >
@@ -557,12 +564,13 @@ export function PdfEditorClient() {
             <p className="text-base font-medium">{t("tools.pdfEditor.drop")}</p>
             <p className="mt-1 text-sm text-muted-foreground">{t("upload.hintPdf")}</p>
             <input
-              ref={imageInputRef}
+              ref={pdfInputRef}
               type="file"
               accept="application/pdf,.pdf"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) handlePdfUpload(e.target.files[0]);
+                e.target.value = "";
               }}
             />
           </div>
@@ -615,7 +623,7 @@ export function PdfEditorClient() {
                 <input
                   ref={imageInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+                  accept="image/*,.png,.jpg,.jpeg,.webp,.heic,.heif,.jfif"
                   className="hidden"
                   onChange={handleImageSelected}
                 />

@@ -1,4 +1,5 @@
 import { recognizeImage, type OcrPage } from "@/lib/ocr";
+import { imageToCanvas } from "@/lib/image";
 import {
   canvasToPngBytes,
   layoutPagesToDocx,
@@ -147,25 +148,7 @@ async function extractVisualRegions(
 }
 
 async function fileToCanvas(file: File): Promise<HTMLCanvasElement> {
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" } as ImageBitmapOptions);
-  } catch {
-    bitmap = await createImageBitmap(file);
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext("2d", { alpha: false });
-  if (!ctx) {
-    bitmap.close?.();
-    throw new Error(`Could not read image "${file.name}".`);
-  }
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close?.();
-  return canvas;
+  return imageToCanvas(file);
 }
 
 export async function convertScreenshotsToDocx(

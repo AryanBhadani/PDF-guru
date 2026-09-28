@@ -11,6 +11,7 @@ import { ProgressBar } from "@/components/pdf/progress-bar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { IMAGE_MIME_TYPES, MAX_IMAGE_COUNT } from "@/lib/constants";
+import { validateImageFile } from "@/lib/image";
 import { downloadBlob, createId } from "@/lib/utils";
 import { useFileQueue } from "@/hooks/use-file-queue";
 import type { ImageFileItem } from "@/types/pdf";
@@ -32,22 +33,34 @@ export function ScreenshotToWordClient() {
     };
   }, []);
 
-  const handleFiles = (files: File[]) => {
+  const handleFiles = async (files: File[]) => {
+    if (files.length === 0) return;
     if (items.length + files.length > MAX_IMAGE_COUNT) {
       toast.error(t("upload.maxImages", { count: MAX_IMAGE_COUNT }));
       return;
     }
-    add(
-      files.map((file) => ({
+
+    const validNewItems: ImageFileItem[] = [];
+    for (const file of files) {
+      const result = await validateImageFile(file);
+      if (!result.valid) {
+        toast.error(result.error || `Could not decode "${file.name}". Please try another image.`);
+        continue;
+      }
+      validNewItems.push({
         id: createId(),
         file,
         name: file.name,
         size: file.size,
         previewUrl: URL.createObjectURL(file),
-      }))
-    );
-    setResult(null);
-    toast.success(t("upload.addedImages", { count: files.length }));
+      });
+    }
+
+    if (validNewItems.length > 0) {
+      add(validNewItems);
+      setResult(null);
+      toast.success(t("upload.addedImages", { count: validNewItems.length }));
+    }
   };
 
   const handleClear = () => {
@@ -89,7 +102,7 @@ export function ScreenshotToWordClient() {
     <PdfToolLayout title={t("tools.screenshotToWord.pageTitle")} description={t("tools.screenshotToWord.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
           title={t("tools.screenshotToWord.drop")}
           hint={t("upload.hintImages")}
           disabled={loading}

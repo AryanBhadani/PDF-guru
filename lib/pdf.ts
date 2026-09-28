@@ -1,22 +1,69 @@
 import { PDFDocument } from "pdf-lib";
 import JSZip from "jszip";
 import { downloadBlob } from "@/lib/utils";
+import { sanitizePdfBytes } from "@/lib/file-type";
+import { loadPdfJsDocument, friendlyPdfError } from "@/lib/pdf-render";
 import type { SplitRange } from "@/types/pdf";
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 
-export async function loadPdf(file: File): Promise<PDFDocument> {
-  const bytes = await file.arrayBuffer();
+export async function loadPdf(
+  fileOrBytes: File | Blob | ArrayBuffer | Uint8Array
+): Promise<PDFDocument> {
+  let rawBytes: Uint8Array;
+  if (fileOrBytes instanceof Uint8Array) {
+    rawBytes = fileOrBytes;
+  } else if (fileOrBytes instanceof ArrayBuffer) {
+    rawBytes = new Uint8Array(fileOrBytes);
+  } else {
+    rawBytes = new Uint8Array(await fileOrBytes.arrayBuffer());
+  }
+
+  const cleanBytes = sanitizePdfBytes(rawBytes);
+
   try {
-    return await PDFDocument.load(bytes, { ignoreEncryption: false });
-  } catch {
-    throw new Error("This PDF is invalid, encrypted, or corrupt.");
+    return await PDFDocument.load(cleanBytes, { ignoreEncryption: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (message.includes("encrypt") || message.includes("password")) {
+      throw new Error("This PDF is password-protected and cannot be opened.");
+    }
+    throw new Error("This PDF is invalid or corrupt.");
   }
 }
 
-export async function getPdfPageCount(file: File): Promise<number> {
-  const pdf = await loadPdf(file);
-  return pdf.getPageCount();
+export async function getPdfPageCount(
+  fileOrBytes: File | Blob | ArrayBuffer | Uint8Array
+): Promise<number> {
+  // Try pdf-lib first
+  try {
+    const pdf = await loadPdf(fileOrBytes);
+    return pdf.getPageCount();
+  } catch (pdfLibError) {
+    // Fallback to pdfjs-dist which is more forgiving of non-standard xrefs / PDF structures
+    try {
+      const doc = await loadPdfJsDocument(fileOrBytes);
+      const count = doc.numPages;
+      await doc.destroy();
+      return count;
+    } catch {
+      throw friendlyPdfError(pdfLibError);
+    }
+  }
+}
+
+export async function validatePdfFile(
+  fileOrBytes: File | Blob
+): Promise<{ valid: boolean; pageCount?: number; error?: string }> {
+  try {
+    const pageCount = await getPdfPageCount(fileOrBytes);
+    return { valid: true, pageCount };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : "This PDF is invalid or corrupt.",
+    };
+  }
 }
 
 export async function mergePdfs(files: File[]): Promise<Uint8Array> {
@@ -32,7 +79,7 @@ export async function mergePdfs(files: File[]): Promise<Uint8Array> {
     pages.forEach((page) => merged.addPage(page));
   }
 
-  return merged.save();
+  return merged.save({ useObjectStreams: false });
 }
 
 export function parseSplitRanges(input: string, pageCount: number): SplitRange[] {
@@ -88,7 +135,7 @@ export async function extractRanges(file: File, ranges: SplitRange[]): Promise<U
     );
     const pages = await extracted.copyPages(source, indices);
     pages.forEach((page) => extracted.addPage(page));
-    outputs.push(await extracted.save());
+    outputs.push(await extracted.save({ useObjectStreams: false }));
   }
 
   return outputs;
@@ -103,7 +150,7 @@ export async function extractAllPages(file: File): Promise<Uint8Array[]> {
     const extracted = await PDFDocument.create();
     const [page] = await extracted.copyPages(source, [i]);
     extracted.addPage(page);
-    outputs.push(await extracted.save());
+    outputs.push(await extracted.save({ useObjectStreams: false }));
   }
 
   return outputs;
@@ -118,7 +165,7 @@ export async function zipPdfs(
 }
 
 export function pdfBytesToBlob(bytes: Uint8Array): Blob {
-  const copy = new Uint8Array(bytes);
+  const copy = bytes.slice(0);
   return new Blob([copy], { type: "application/pdf" });
 }
 

@@ -130,7 +130,7 @@ export function CleanPdfClient() {
     <PdfToolLayout title={t("tools.cleanPdf.pageTitle")} description={t("tools.cleanPdf.pageDesc")}>
       <div className="space-y-6">
         <FileUpload
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
           multiple={false}
           title={t("tools.cleanPdf.drop")}
           hint={t("upload.hintImages")}

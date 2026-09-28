@@ -8,12 +8,21 @@ export const MAX_IMAGE_COUNT = 50;
 export const MAX_PDF_COUNT = 30;
 
 export const IMAGE_ACCEPT = {
-  "image/jpeg": [".jpg", ".jpeg"],
+  "image/jpeg": [".jpg", ".jpeg", ".jfif", ".pjpeg"],
   "image/png": [".png"],
   "image/webp": [".webp"],
+  "image/heic": [".heic", ".heif"],
 };
 
-export const IMAGE_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+export const IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/*",
+];
 export const PDF_MIME_TYPE = "application/pdf";
 export const DOCUMENT_MIME_TYPES = [...IMAGE_MIME_TYPES, PDF_MIME_TYPE];
 

@@ -19,12 +19,14 @@ import { useFileQueue } from "@/hooks/use-file-queue";
 import type { ImageFileItem } from "@/types/pdf";
 import type { PhotoPdfQuality } from "@/types/conversion";
 import { useT } from "@/components/i18n/language-provider";
+import { CameraScannerModal } from "@/components/scanner/camera-scanner-modal";
 
 export function PhotoToPdfClient() {
   const t = useT();
   const { items, add, remove, clear, move } = useFileQueue<ImageFileItem>();
   const [loading, setLoading] = useState(false);
   const [quality, setQuality] = useState<PhotoPdfQuality>("medium");
+  const [scannerOpen, setScannerOpen] = useState(false);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +49,7 @@ export function PhotoToPdfClient() {
     for (const file of files) {
       const result = await validateImageFile(file);
       if (!result.valid) {
-        toast.error(t("tools.photoToPdf.decodeFailed", { name: file.name }));
+        toast.error(result.error || t("tools.photoToPdf.decodeFailed", { name: file.name }));
         continue;
       }
 
@@ -72,22 +74,35 @@ export function PhotoToPdfClient() {
 
   const handleTakePhotoClick = async () => {
     if (loading) return;
-    try {
-      if (typeof navigator !== "undefined" && navigator.permissions?.query) {
-        const status = await navigator.permissions.query({ name: "camera" as PermissionName }).catch(() => null);
-        if (status?.state === "denied") {
-          toast.error(t("tools.photoToPdf.cameraDenied"));
-          return;
+    if (
+      typeof navigator !== "undefined" &&
+      "mediaDevices" in navigator &&
+      typeof navigator.mediaDevices.getUserMedia === "function"
+    ) {
+      try {
+        if ("permissions" in navigator && typeof navigator.permissions?.query === "function") {
+          const status = await navigator.permissions.query({ name: "camera" as PermissionName }).catch(() => null);
+          if (status?.state === "denied") {
+            toast.error(t("tools.photoToPdf.cameraDenied"));
+            return;
+          }
         }
+      } catch {
+        // Permissions API query unsupported
       }
-    } catch {
-      // Permissions API not supported or query unsupported for camera
+      setScannerOpen(true);
+      return;
     }
+
     try {
       cameraInputRef.current?.click();
     } catch {
       toast.error(t("tools.photoToPdf.cameraDenied"));
     }
+  };
+
+  const handleScannerComplete = (scannedFiles: File[]) => {
+    void processFiles(scannedFiles, true);
   };
 
   const handleCameraCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,7 +152,7 @@ export function PhotoToPdfClient() {
       <div className="space-y-6">
         <div className="space-y-3">
           <FileUpload
-            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+            accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
             title={t("upload.dropImages")}
             hint={t("upload.hintImages")}
             disabled={loading}
@@ -165,6 +180,12 @@ export function PhotoToPdfClient() {
             className="hidden"
             disabled={loading}
             onChange={handleCameraCapture}
+          />
+          <CameraScannerModal
+            isOpen={scannerOpen}
+            onClose={() => setScannerOpen(false)}
+            onComplete={handleScannerComplete}
+            onFallbackToFile={() => cameraInputRef.current?.click()}
           />
         </div>
 

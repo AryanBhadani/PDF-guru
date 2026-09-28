@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import type { ImageOutputFormat, ProgressCallback } from "@/types/conversion";
+import { sanitizePdfBytes } from "./file-type";
 
 const WORKER_SRC = "/pdf.worker.min.mjs";
 
@@ -14,25 +15,55 @@ export async function getPdfJs() {
   return pdfjs;
 }
 
-function friendlyPdfError(error: unknown): Error {
+export function friendlyPdfError(error: unknown): Error {
   if (error instanceof Error) {
     const name = error.name || "";
     const message = error.message || "";
-    if (name === "PasswordException" || message.toLowerCase().includes("password")) {
+    const lower = message.toLowerCase();
+    if (
+      name === "PasswordException" ||
+      lower.includes("password") ||
+      lower.includes("encrypted")
+    ) {
       return new Error("This PDF is password-protected and cannot be opened.");
     }
-    if (name === "InvalidPDFException" || message.toLowerCase().includes("invalid pdf")) {
+    if (
+      name === "InvalidPDFException" ||
+      name === "FormatError" ||
+      lower.includes("invalid pdf") ||
+      lower.includes("pdf header not found")
+    ) {
       return new Error("This PDF is invalid or corrupt.");
     }
+    return error;
   }
   return new Error("Could not read this PDF.");
 }
 
-export async function loadPdfJsDocument(file: File): Promise<PDFDocumentProxy> {
+export async function loadPdfJsDocument(
+  fileOrBuffer: File | Blob | ArrayBuffer | Uint8Array
+): Promise<PDFDocumentProxy> {
   try {
     const pdfjs = await getPdfJs();
-    const data = new Uint8Array(await file.arrayBuffer());
-    return await pdfjs.getDocument({ data, isEvalSupported: false, disableAutoFetch: true }).promise;
+    let rawBytes: Uint8Array;
+
+    if (fileOrBuffer instanceof Uint8Array) {
+      rawBytes = fileOrBuffer;
+    } else if (fileOrBuffer instanceof ArrayBuffer) {
+      rawBytes = new Uint8Array(fileOrBuffer);
+    } else {
+      rawBytes = new Uint8Array(await fileOrBuffer.arrayBuffer());
+    }
+
+    // Sanitize bytes by trimming leading BOM or whitespace before %PDF-
+    const cleanBytes = sanitizePdfBytes(rawBytes);
+
+    // Pass a fresh detached-safe slice so PDF.js worker transfers do not affect caller buffers
+    return await pdfjs.getDocument({
+      data: cleanBytes.slice(0),
+      isEvalSupported: false,
+      disableAutoFetch: true,
+    }).promise;
   } catch (error) {
     throw friendlyPdfError(error);
   }

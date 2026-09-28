@@ -1,5 +1,7 @@
 import { PDFDocument } from "pdf-lib";
 import { canvasToBlob, loadPdfJsDocument, renderPageToCanvas, yieldToMain } from "@/lib/pdf-render";
+import { imageToCanvas } from "@/lib/image";
+import { isPdfFile } from "@/lib/file-type";
 import { createId } from "@/lib/utils";
 import type { MaskRect, MaskSourceKind } from "@/types/masking";
 
@@ -126,15 +128,11 @@ function clamp01(value: number): number {
 }
 
 export async function maskImageFile(file: File, rects: MaskRect[]): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  const canvas = await imageToCanvas(file);
   const ctx = canvas.getContext("2d");
   if (!ctx) {
     throw new Error("Could not mask this image.");
   }
-  ctx.drawImage(bitmap, 0, 0);
   drawRects(ctx, rects.filter((rect) => rect.pageIndex === 0), canvas.width, canvas.height);
   const type = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const blob = await canvasToBlob(canvas, type, 0.92);
@@ -178,7 +176,7 @@ export async function maskPdfFile(
   }
 
   await source.destroy();
-  return output.save({ useObjectStreams: true });
+  return output.save({ useObjectStreams: false });
 }
 
 function drawRects(
@@ -199,8 +197,9 @@ function drawRects(
   }
 }
 
-export function sourceKindFromFile(file: File): MaskSourceKind {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "image";
+export async function sourceKindFromFile(file: File): Promise<MaskSourceKind> {
+  const isPdf = await isPdfFile(file);
+  return isPdf ? "pdf" : "image";
 }
 
 export function maskedFileName(file: File, kind: MaskSourceKind): string {

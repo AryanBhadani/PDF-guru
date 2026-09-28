@@ -13,6 +13,8 @@ import { MaskCanvas } from "@/components/masking/mask-canvas";
 import { Button } from "@/components/ui/button";
 import { DOCUMENT_MIME_TYPES } from "@/lib/constants";
 import { downloadPdf, getPdfPageCount } from "@/lib/pdf";
+import { imageToCanvas } from "@/lib/image";
+import { isPdfFile } from "@/lib/file-type";
 import { downloadBlob } from "@/lib/utils";
 import type { MaskRect } from "@/types/masking";
 import { useT } from "@/components/i18n/language-provider";
@@ -44,9 +46,19 @@ export function MaskDocumentClient() {
   const loadPreview = async (nextFile: File, nextKind: "pdf" | "image", index: number) => {
     revokePreview();
     if (nextKind === "image") {
-      const url = URL.createObjectURL(nextFile);
-      previewUrlRef.current = url;
-      setPreviewUrl(url);
+      try {
+        const canvas = await imageToCanvas(nextFile);
+        const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.9));
+        canvas.width = 0;
+        canvas.height = 0;
+        const url = blob ? URL.createObjectURL(blob) : URL.createObjectURL(nextFile);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      } catch {
+        const url = URL.createObjectURL(nextFile);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+      }
       return;
     }
     const { loadPdfJsDocument, renderPageToCanvas } = await import("@/lib/pdf-render");
@@ -66,8 +78,8 @@ export function MaskDocumentClient() {
   const handleFiles = async (files: File[]) => {
     const next = files[0];
     if (!next) return;
-    const nextKind =
-      next.type === "application/pdf" || next.name.toLowerCase().endsWith(".pdf") ? "pdf" : "image";
+    const isPdf = await isPdfFile(next);
+    const nextKind: "pdf" | "image" = isPdf ? "pdf" : "image";
     try {
       const count = nextKind === "pdf" ? await getPdfPageCount(next) : 1;
       setFile(next);
@@ -120,7 +132,7 @@ export function MaskDocumentClient() {
       const { maskPdfFile, maskImageFile, maskedFileName, sourceKindFromFile } = await import(
         "@/lib/document-masking"
       );
-      const sourceKind = sourceKindFromFile(file);
+      const sourceKind = await sourceKindFromFile(file);
       if (sourceKind === "pdf") {
         const bytes = await maskPdfFile(file, rects, (current, total) => setProgress({ current, total }));
         downloadPdf(bytes, maskedFileName(file, "pdf"));
@@ -143,7 +155,7 @@ export function MaskDocumentClient() {
           {t("tools.maskDocument.warning")}
         </div>
         <FileUpload
-          accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
+          accept="application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
           multiple={false}
           title={t("upload.dropPdfOrImage")}
           hint={t("upload.hintImages")}

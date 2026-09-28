@@ -1,4 +1,5 @@
 import { PDFDocument } from "pdf-lib";
+import { imageToCanvas } from "@/lib/image";
 
 export type CleanMode = "color" | "grayscale" | "bw";
 
@@ -44,16 +45,21 @@ function luminance(r: number, g: number, b: number): number {
 }
 
 export async function loadImageToCanvas(file: File): Promise<HTMLCanvasElement> {
-  const bitmap = await createImageBitmap(file);
+  const fullCanvas = await imageToCanvas(file);
   const maxSide = 2400;
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const currentMax = Math.max(fullCanvas.width, fullCanvas.height);
+  if (currentMax <= maxSide) {
+    return fullCanvas;
+  }
+  const scale = maxSide / currentMax;
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.width = Math.max(1, Math.round(fullCanvas.width * scale));
+  canvas.height = Math.max(1, Math.round(fullCanvas.height * scale));
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("Could not read this image.");
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
+  ctx.drawImage(fullCanvas, 0, 0, canvas.width, canvas.height);
+  fullCanvas.width = 0;
+  fullCanvas.height = 0;
   return canvas;
 }
 
