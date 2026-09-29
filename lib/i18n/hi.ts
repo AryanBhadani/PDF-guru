@@ -22,6 +22,15 @@ export const hi: Messages = {
     menu: "मेनू",
     language: "भाषा",
   },
+  saveDialog: {
+    title: "फ़ाइल सहेजें",
+    subtitle: "डाउनलोड करने से पहले अपनी फ़ाइल का नाम बदलें",
+    fileNameLabel: "फ़ाइल का नाम",
+    previewLabel: "इस नाम से सहेजी जाएगी",
+    save: "सहेजें",
+    cancel: "रद्द करें",
+    fileReady: "फ़ाइल सहेजने के लिए तैयार है",
+  },
   common: {
     upload: "अपलोड",
     download: "डाउनलोड",

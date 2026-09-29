@@ -169,8 +169,8 @@ export function pdfBytesToBlob(bytes: Uint8Array): Blob {
   return new Blob([copy], { type: "application/pdf" });
 }
 
-export function downloadPdf(bytes: Uint8Array, filename: string): void {
-  downloadBlob(pdfBytesToBlob(bytes), filename);
+export function downloadPdf(bytes: Uint8Array, filename: string): Promise<boolean> {
+  return downloadBlob(pdfBytesToBlob(bytes), filename);
 }
 
 export function rangeLabel(range: SplitRange): string {

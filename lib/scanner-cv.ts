@@ -109,10 +109,27 @@ export function getDefaultQuad(width: number, height: number, mode: ScannerMode 
 
 /**
  * Smooths quadrilateral corners across video frames using Exponential Moving Average (EMA).
+ * Adapts alpha dynamically: subtle for micro-jitter/hand tremor, responsive for large camera moves.
  */
 export function smoothQuad(current: Quad, previous: Quad | null, alpha = 0.35): Quad {
   if (!previous) return current;
-  const lerp = (a: number, b: number) => Math.round(a * (1 - alpha) + b * alpha);
+
+  let effectiveAlpha = alpha;
+  if (alpha === 0.35) {
+    const dTL = distance(previous.tl, current.tl);
+    const dTR = distance(previous.tr, current.tr);
+    const dBR = distance(previous.br, current.br);
+    const dBL = distance(previous.bl, current.bl);
+    const maxDelta = Math.max(dTL, dTR, dBR, dBL);
+
+    if (maxDelta < 6) {
+      effectiveAlpha = 0.2;
+    } else if (maxDelta > 24) {
+      effectiveAlpha = 0.6;
+    }
+  }
+
+  const lerp = (a: number, b: number) => Math.round(a * (1 - effectiveAlpha) + b * effectiveAlpha);
   return {
     tl: { x: lerp(previous.tl.x, current.tl.x), y: lerp(previous.tl.y, current.tl.y) },
     tr: { x: lerp(previous.tr.x, current.tr.x), y: lerp(previous.tr.y, current.tr.y) },
@@ -184,7 +201,31 @@ export function detectDocumentQuad(
     hist[lum]++;
   }
 
-  // 2. Otsu thresholding for document paper separation
+  // 2. Compute dynamic contrast percentiles and background estimation from frame corners
+  const corner1 = gray[2 * targetWidth + 2];
+  const corner2 = gray[2 * targetWidth + (targetWidth - 3)];
+  const corner3 = gray[(targetHeight - 3) * targetWidth + 2];
+  const corner4 = gray[(targetHeight - 3) * targetWidth + (targetWidth - 3)];
+  const estimatedBgLum = (corner1 + corner2 + corner3 + corner4) >> 2;
+
+  // 10th and 90th percentile luminance for adaptive sensitivity
+  let p10 = 0;
+  let p90 = 255;
+  let acc = 0;
+  const count10 = totalPixels * 0.1;
+  const count90 = totalPixels * 0.9;
+  for (let t = 0; t < 256; t++) {
+    acc += hist[t];
+    if (acc >= count10 && p10 === 0) p10 = t;
+    if (acc >= count90) {
+      p90 = t;
+      break;
+    }
+  }
+  const dynamicRange = Math.max(20, p90 - p10);
+  const minEdgeDiff = Math.max(12, Math.min(32, Math.round(dynamicRange * 0.16)));
+
+  // 3. Otsu thresholding for document paper separation
   let sum = 0;
   for (let t = 0; t < 256; t++) sum += t * hist[t];
   let sumB = 0;
@@ -207,15 +248,15 @@ export function detectDocumentQuad(
     }
   }
 
-  // 3. Sobel edge detection & boundary transition analysis
-  // Sample along 36 radial lines emanating from frame center to find document perimeter
+  // 4. Perimeter Boundary Ray-Casting with Notebook Ruling Suppression & Step Persistence
+  // Sample along 48 radial lines emanating from frame center to find document perimeter
   const cx = targetWidth >> 1;
   const cy = targetHeight >> 1;
   const centerLum = gray[cy * targetWidth + cx];
   const isDocumentLighter = centerLum >= otsuThreshold;
 
   const boundaryPoints: Point[] = [];
-  const NUM_RAYS = 36;
+  const NUM_RAYS = 48;
   const maxR = Math.hypot(cx, cy);
 
   for (let r = 0; r < NUM_RAYS; r++) {
@@ -237,14 +278,49 @@ export function detectDocumentQuad(
       const idx = py * targetWidth + px;
       const val = gray[idx];
 
-      // Check contrast gradient against center
+      // Check contrast gradient against center and previous sample
       const diff = Math.abs(val - lastVal);
-      const crossedOtsu = isDocumentLighter ? val < otsuThreshold - 15 : val > otsuThreshold + 15;
+      const crossedOtsu = isDocumentLighter
+        ? val < otsuThreshold - 12 || val <= estimatedBgLum + 10
+        : val > otsuThreshold + 12 || val >= estimatedBgLum - 10;
 
-      if (diff > 35 || crossedOtsu) {
-        boundaryPoints.push({ x: px, y: py });
-        edgeFound = true;
-        break;
+      if (diff > minEdgeDiff || crossedOtsu) {
+        // Look-ahead verification to suppress notebook lines, handwriting, or text strokes
+        // Notebook rulings are thin (1-2 samples); a real document edge remains persistent.
+        const aheadStep1 = step + 6;
+        const aheadStep2 = step + 12;
+        const ax1 = Math.round(cx + cos * aheadStep1);
+        const ay1 = Math.round(cy + sin * aheadStep1);
+        const ax2 = Math.round(cx + cos * aheadStep2);
+        const ay2 = Math.round(cy + sin * aheadStep2);
+
+        let isImpulse = false;
+        if (
+          ax1 > 2 &&
+          ax1 < targetWidth - 3 &&
+          ay1 > 2 &&
+          ay1 < targetHeight - 3 &&
+          ax2 > 2 &&
+          ax2 < targetWidth - 3 &&
+          ay2 > 2 &&
+          ay2 < targetHeight - 3
+        ) {
+          const val1 = gray[ay1 * targetWidth + ax1];
+          const val2 = gray[ay2 * targetWidth + ax2];
+          // If the signal bounces back towards center luminance, it is internal ink/ruling
+          if (
+            Math.abs(val1 - centerLum) < minEdgeDiff &&
+            Math.abs(val2 - centerLum) < minEdgeDiff
+          ) {
+            isImpulse = true;
+          }
+        }
+
+        if (!isImpulse) {
+          boundaryPoints.push({ x: px, y: py });
+          edgeFound = true;
+          break;
+        }
       }
       lastVal = val;
     }
@@ -257,16 +333,39 @@ export function detectDocumentQuad(
     }
   }
 
-  // 4. Extract 4 candidate corners from boundary points
+  // 5. Extract 4 candidate corners from boundary points
   if (boundaryPoints.length < 4) {
     return { quad: getDefaultQuad(srcWidth, srcHeight, mode), confidence: 0, detected: false };
   }
 
-  // Find 4 extreme projection points:
-  // TL: min(x + y)
-  // TR: max(x - y)
-  // BR: max(x + y)
-  // BL: min(x - y)
+  // Determine centroid and principal orientation angle to support tilted documents
+  let sumX = 0;
+  let sumY = 0;
+  for (const p of boundaryPoints) {
+    sumX += p.x;
+    sumY += p.y;
+  }
+  const centroidX = sumX / boundaryPoints.length;
+  const centroidY = sumY / boundaryPoints.length;
+
+  let m20 = 0;
+  let m02 = 0;
+  let m11 = 0;
+  for (const p of boundaryPoints) {
+    const dx = p.x - centroidX;
+    const dy = p.y - centroidY;
+    m20 += dx * dx;
+    m02 += dy * dy;
+    m11 += dx * dy;
+  }
+
+  let theta = 0.5 * Math.atan2(2 * m11, m20 - m02);
+  if (theta > Math.PI / 4) theta -= Math.PI / 2;
+  if (theta < -Math.PI / 4) theta += Math.PI / 2;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+
+  // Project boundary points onto document-aligned coordinate frame
   let tl = boundaryPoints[0];
   let tr = boundaryPoints[0];
   let br = boundaryPoints[0];
@@ -278,8 +377,13 @@ export function detectDocumentQuad(
   let maxDiff = -Infinity;
 
   for (const p of boundaryPoints) {
-    const sumVal = p.x + p.y;
-    const diffVal = p.x - p.y;
+    const dx = p.x - centroidX;
+    const dy = p.y - centroidY;
+    const rx = dx * cosT + dy * sinT;
+    const ry = -dx * sinT + dy * cosT;
+
+    const sumVal = rx + ry;
+    const diffVal = rx - ry;
 
     if (sumVal < minSum) {
       minSum = sumVal;
@@ -386,6 +490,22 @@ export function warpPerspective(
 
   if (!destCtx || !srcCtx) {
     throw new Error("Failed to get 2D rendering context for perspective warp");
+  }
+
+  // Full Page optimization: when quad covers the full canvas, directly render without warp artifacts
+  const isFullPage =
+    quad.tl.x <= 2 &&
+    quad.tl.y <= 2 &&
+    Math.abs(quad.tr.x - srcWidth) <= 2 &&
+    quad.tr.y <= 2 &&
+    Math.abs(quad.br.x - srcWidth) <= 2 &&
+    Math.abs(quad.br.y - srcHeight) <= 2 &&
+    quad.bl.x <= 2 &&
+    Math.abs(quad.bl.y - srcHeight) <= 2;
+
+  if (isFullPage) {
+    destCtx.drawImage(sourceCanvas, 0, 0, destWidth, destHeight);
+    return destCanvas;
   }
 
   const srcImageData = srcCtx.getImageData(0, 0, srcWidth, srcHeight);

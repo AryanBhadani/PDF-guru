@@ -153,6 +153,51 @@ const idRatio = 85.6 / 53.98;
 assert(Math.abs(idRatio - 1.58577) < 0.001, "ID-1 card ratio matches standard");
 console.log("✓ Test 8 Passed: ID Card aspect ratio standard confirmed");
 
+// Test 9: splitFileName across multiple extensions and dots
+import { splitFileName, sanitizeFileName, buildFinalFileName } from "../lib/utils.ts";
+
+const fn1 = splitFileName("report.pdf");
+assert(fn1.baseName === "report" && fn1.extension === ".pdf", "splitFileName standard .pdf");
+const fn2 = splitFileName("data.analysis.2024.xlsx");
+assert(fn2.baseName === "data.analysis.2024" && fn2.extension === ".xlsx", "splitFileName multi-dot .xlsx");
+const fn3 = splitFileName("archive.zip");
+assert(fn3.baseName === "archive" && fn3.extension === ".zip", "splitFileName .zip");
+const fn4 = splitFileName("photo.png");
+assert(fn4.baseName === "photo" && fn4.extension === ".png", "splitFileName .png");
+const fn5 = splitFileName("document");
+assert(fn5.baseName === "document" && fn5.extension === "", "splitFileName no extension");
+console.log("✓ Test 9 Passed: splitFileName multi-extension parsing");
+
+// Test 10: buildFinalFileName auto-extension preservation & duplicate prevention
+assert(buildFinalFileName("my_doc", ".pdf") === "my_doc.pdf", "Auto append .pdf");
+assert(buildFinalFileName("my_doc.pdf", ".pdf") === "my_doc.pdf", "Prevent double .pdf");
+assert(buildFinalFileName("my_doc.PDF", ".pdf") === "my_doc.PDF", "Case-insensitive check");
+assert(buildFinalFileName("financials", ".xlsx") === "financials.xlsx", "Auto append .xlsx");
+assert(buildFinalFileName("financials.xlsx", ".xlsx") === "financials.xlsx", "Prevent double .xlsx");
+assert(buildFinalFileName("summary", ".docx") === "summary.docx", "Auto append .docx");
+assert(buildFinalFileName("images", ".zip") === "images.zip", "Auto append .zip");
+assert(buildFinalFileName("page-1", ".png") === "page-1.png", "Auto append .png");
+assert(buildFinalFileName("", ".pdf") === "file.pdf", "Fallback for empty base name");
+console.log("✓ Test 10 Passed: buildFinalFileName auto-extension preservation");
+
+// Test 11: sanitizeFileName
+assert(sanitizeFileName('report/2024:final*?"<>|') === "report-2024-final", "Sanitizes forbidden OS characters");
+assert(sanitizeFileName("   valid_name   ") === "valid_name", "Trims whitespace");
+console.log("✓ Test 11 Passed: sanitizeFileName illegal character removal");
+
+// Test 12: smoothQuad adaptive alpha test
+const stablePrev = { tl: { x: 100, y: 100 }, tr: { x: 200, y: 100 }, br: { x: 200, y: 200 }, bl: { x: 100, y: 200 } };
+// 2px tiny tremor -> should use dampening alpha 0.2 (lerp: 100 * 0.8 + 102 * 0.2 = 100.4 -> 100)
+const tremorCurr = { tl: { x: 102, y: 102 }, tr: { x: 202, y: 102 }, br: { x: 202, y: 202 }, bl: { x: 102, y: 202 } };
+const tremorSmoothed = smoothQuad(tremorCurr, stablePrev);
+assert(tremorSmoothed.tl.x === 100, `Expected tremor dampening x=100, got ${tremorSmoothed.tl.x}`);
+
+// 40px large movement -> should use fast alpha 0.6 (lerp: 100 * 0.4 + 140 * 0.6 = 124)
+const fastMoveCurr = { tl: { x: 140, y: 140 }, tr: { x: 240, y: 140 }, br: { x: 240, y: 240 }, bl: { x: 140, y: 240 } };
+const fastSmoothed = smoothQuad(fastMoveCurr, stablePrev);
+assert(fastSmoothed.tl.x === 124, `Expected fast tracking x=124, got ${fastSmoothed.tl.x}`);
+console.log("✓ Test 12 Passed: smoothQuad adaptive tracking (tremor dampening + pan responsiveness)");
+
 console.log("\n==================================");
-console.log("ALL 8/8 SCANNER CV TESTS PASSED!");
+console.log("ALL 12/12 SCANNER & DOWNLOAD TESTS PASSED!");
 console.log("==================================");

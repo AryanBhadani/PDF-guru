@@ -7,6 +7,7 @@ import {
   Check,
   CreditCard,
   FileText,
+  Images,
   Maximize2,
   RotateCw,
   Sparkles,
@@ -90,9 +91,25 @@ export function CameraScannerModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const adjustCanvasRef = useRef<HTMLCanvasElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const prevQuadRef = useRef<Quad | null>(null);
+  const lostFramesRef = useRef(0);
+
+  // Lock body scroll on mobile and desktop while scanner modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [isOpen]);
 
   // Clean up ObjectURLs when pages change or unmount
   useEffect(() => {
@@ -227,10 +244,27 @@ export function CameraScannerModal({
         if (ctx) {
           ctx.clearRect(0, 0, vw, vh);
 
-          // Run real-time 4-corner detection
+          // Run real-time 4-corner detection with tracking hysteresis
           const result = detectDocumentQuad(video, mode);
-          const smoothed = smoothQuad(result.quad, prevQuadRef.current, 0.35);
-          prevQuadRef.current = smoothed;
+          let smoothed: Quad;
+          let isDetected = false;
+
+          if (result.detected) {
+            lostFramesRef.current = 0;
+            smoothed = smoothQuad(result.quad, prevQuadRef.current);
+            prevQuadRef.current = smoothed;
+            isDetected = true;
+          } else if (prevQuadRef.current && lostFramesRef.current < 12) {
+            // Hysteresis: retain tracked quad across momentary blurs / hand tremors
+            lostFramesRef.current += 1;
+            smoothed = prevQuadRef.current;
+            isDetected = true;
+          } else {
+            const defQuad = getDefaultQuad(vw, vh, mode);
+            smoothed = smoothQuad(defQuad, prevQuadRef.current, 0.15);
+            prevQuadRef.current = smoothed;
+            isDetected = false;
+          }
 
           // Render quadrilateral overlay
           ctx.save();
@@ -243,16 +277,16 @@ export function CameraScannerModal({
           ctx.lineTo(smoothed.bl.x, smoothed.bl.y);
           ctx.closePath();
 
-          ctx.fillStyle = result.detected
+          ctx.fillStyle = isDetected
             ? "rgba(59, 130, 246, 0.18)" // Soft blue
             : "rgba(255, 255, 255, 0.08)";
           ctx.fill();
 
           // Stroke border
           ctx.lineWidth = Math.max(3, Math.round(vw / 300));
-          ctx.strokeStyle = result.detected ? "#38bdf8" : "rgba(255, 255, 255, 0.6)";
+          ctx.strokeStyle = isDetected ? "#38bdf8" : "rgba(255, 255, 255, 0.6)";
           ctx.lineJoin = "round";
-          ctx.shadowColor = result.detected ? "#0284c7" : "transparent";
+          ctx.shadowColor = isDetected ? "#0284c7" : "transparent";
           ctx.shadowBlur = 10;
           ctx.stroke();
 
@@ -319,11 +353,13 @@ export function CameraScannerModal({
 
     ctx.drawImage(video, 0, 0, vw, vh);
 
-    // Detect quad on captured frame
+    // Detect quad on captured frame with fallback to stable tracked quad
     const result = detectDocumentQuad(captureCanvas, mode);
     const finalQuad = result.detected
       ? result.quad
-      : prevQuadRef.current || getDefaultQuad(vw, vh, mode);
+      : (prevQuadRef.current && lostFramesRef.current < 12)
+      ? prevQuadRef.current
+      : getDefaultQuad(vw, vh, mode);
 
     setCapturedRawCanvas(captureCanvas);
     setDetectedQuad(finalQuad);
@@ -331,6 +367,42 @@ export function CameraScannerModal({
     setSelectedFilter("document");
     setActiveEditingPageIndex(null);
     setViewState("adjust");
+  };
+
+  // Import Image from Gallery / File Storage
+  const handleGalleryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const first = files[0];
+    e.target.value = "";
+
+    const img = new window.Image();
+    const url = URL.createObjectURL(first);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+
+      const result = detectDocumentQuad(canvas, mode);
+      const finalQuad = result.detected ? result.quad : getDefaultQuad(canvas.width, canvas.height, mode);
+
+      setCapturedRawCanvas(canvas);
+      setDetectedQuad(finalQuad);
+      setEditingQuad({ ...finalQuad });
+      setSelectedFilter("document");
+      setActiveEditingPageIndex(null);
+      setViewState("adjust");
+      toast.success("Image imported for scanning!");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast.error("Failed to load image from gallery.");
+    };
+    img.src = url;
   };
 
   // Render Adjust/Review Screen Canvas
@@ -719,9 +791,18 @@ export function CameraScannerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col bg-black text-white select-none">
+    <div className="fixed inset-0 z-50 flex h-[100dvh] max-h-dvh w-full flex-col bg-black text-white select-none overflow-hidden overscroll-none touch-none">
+      {/* Hidden Gallery Picker Input */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleGalleryImport}
+      />
+
       {/* ================= TOP NAVIGATION BAR ================= */}
-      <header className="flex h-14 shrink-0 items-center justify-between px-4 z-20 bg-black/60 backdrop-blur-md">
+      <header className="flex h-14 shrink-0 items-center justify-between px-4 z-20 bg-black/70 backdrop-blur-md pt-[max(env(safe-area-inset-top),0.25rem)]">
         <Button
           variant="ghost"
           size="icon"
@@ -785,7 +866,7 @@ export function CameraScannerModal({
       </header>
 
       {/* ================= VIEWPORT AREA ================= */}
-      <main className="relative flex-1 overflow-hidden flex items-center justify-center bg-black">
+      <main className="relative flex-1 overflow-hidden flex items-center justify-center bg-black w-full min-h-0">
         {/* Camera Permission / Error Fallback */}
         {cameraError ? (
           <div className="flex flex-col items-center max-w-sm px-6 text-center space-y-4">
@@ -845,7 +926,7 @@ export function CameraScannerModal({
       </main>
 
       {/* ================= BOTTOM CONTROLS & TRAY ================= */}
-      <footer className="shrink-0 bg-neutral-950/95 border-t border-neutral-800/80 px-4 pt-2 pb-6 flex flex-col gap-3">
+      <footer className="shrink-0 bg-neutral-950/95 border-t border-neutral-800/80 px-4 pt-2.5 pb-[max(env(safe-area-inset-bottom),1.25rem)] flex flex-col gap-3">
         {viewState === "camera" ? (
           <>
             {/* Mode Switcher: Docs vs ID Card */}
@@ -886,7 +967,7 @@ export function CameraScannerModal({
 
             {/* Shutter Bar */}
             <div className="flex items-center justify-between px-2">
-              {/* Thumbnail Session Stack */}
+              {/* Thumbnail Session Stack or Gallery Import */}
               <div className="w-16 flex items-center justify-start">
                 {pages.length > 0 ? (
                   <button
@@ -906,18 +987,27 @@ export function CameraScannerModal({
                     </span>
                   </button>
                 ) : (
-                  <div className="h-12 w-12" />
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="relative flex flex-col items-center justify-center rounded-xl border border-neutral-700 h-12 w-12 bg-neutral-900/90 text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
+                    title="Import from Gallery"
+                    aria-label="Import from Gallery"
+                  >
+                    <Images className="h-5 w-5" />
+                    <span className="text-[9px] mt-0.5 leading-none">Gallery</span>
+                  </button>
                 )}
               </div>
 
-              {/* Shutter Capture Button */}
+              {/* Large 64px+ Shutter Capture Button (74px outer diameter) */}
               <button
                 type="button"
                 onClick={handleCapture}
-                className="group relative flex h-18 w-18 items-center justify-center rounded-full border-4 border-white/80 p-1 transition-transform active:scale-95"
+                className="group relative flex h-[74px] w-[74px] shrink-0 items-center justify-center rounded-full border-4 border-white/80 p-1 transition-transform active:scale-95 shadow-xl"
                 aria-label="Take Photo"
               >
-                <div className="h-full w-full rounded-full bg-white transition-colors group-hover:bg-neutral-200" />
+                <div className="h-[58px] w-[58px] rounded-full bg-white transition-all group-hover:bg-neutral-200 group-active:scale-90 shadow-md" />
               </button>
 
               {/* Done Button */}

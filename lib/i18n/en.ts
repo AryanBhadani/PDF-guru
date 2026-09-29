@@ -20,6 +20,15 @@ export const en = {
     menu: "Menu",
     language: "Language",
   },
+  saveDialog: {
+    title: "Save File",
+    subtitle: "Rename your file before downloading",
+    fileNameLabel: "File name",
+    previewLabel: "Will be saved as",
+    save: "Save",
+    cancel: "Cancel",
+    fileReady: "File ready to save",
+  },
   common: {
     upload: "Upload",
     download: "Download",
