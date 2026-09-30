@@ -36,8 +36,12 @@ function hexToRgb(hex: string) {
   };
 }
 
-async function prepareImageBytes(file: File, quality: number): Promise<{ bytes: Uint8Array; width: number; height: number; kind: "jpg" | "png" }> {
-  const canvas = await imageToCanvas(file);
+async function prepareImageBytes(
+  file: File,
+  quality: number,
+  rotation = 0
+): Promise<{ bytes: Uint8Array; width: number; height: number; kind: "jpg" | "png" }> {
+  const canvas = await imageToCanvas(file, rotation);
   const usePng = file.type === "image/png" && quality >= 0.9;
   let bytes: Uint8Array;
   let kind: "jpg" | "png" = "jpg";
@@ -83,7 +87,12 @@ function marginPt(options: ImageToPdfOptions): number {
   return MARGIN_PT[options.margin];
 }
 
-export async function createAdvancedImagePdf(files: File[], options: ImageToPdfOptions): Promise<Uint8Array> {
+export type ImageToPdfInput = File | { file: File; rotation?: number };
+
+export async function createAdvancedImagePdf(
+  files: ImageToPdfInput[],
+  options: ImageToPdfOptions
+): Promise<Uint8Array> {
   if (files.length === 0) {
     throw new Error("Upload at least one image.");
   }
@@ -94,8 +103,10 @@ export async function createAdvancedImagePdf(files: File[], options: ImageToPdfO
   const quality = QUALITY[options.quality];
 
   for (let index = 0; index < files.length; index += 1) {
-    const file = files[index];
-    const prepared = await prepareImageBytes(file, quality);
+    const entry = files[index];
+    const file = entry instanceof File ? entry : entry.file;
+    const rotation = entry instanceof File ? 0 : (entry.rotation || 0) % 360;
+    const prepared = await prepareImageBytes(file, quality, rotation);
     const image =
       prepared.kind === "png" ? await pdf.embedPng(prepared.bytes) : await pdf.embedJpg(prepared.bytes);
     const [pageWidth, pageHeight] = pageDimensions(options, image.width, image.height);

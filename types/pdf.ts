@@ -12,6 +12,7 @@ export type ImageFileItem = {
   name: string;
   size: number;
   previewUrl: string;
+  rotation?: number;
 };
 
 export type SplitRange = {

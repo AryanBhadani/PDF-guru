@@ -369,23 +369,16 @@ export function CameraScannerModal({
     setViewState("adjust");
   };
 
-  // Import Image from Gallery / File Storage
-  const handleGalleryImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Import Image from Gallery / File Storage with EXIF orientation handling
+  const handleGalleryImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const first = files[0];
     e.target.value = "";
 
-    const img = new window.Image();
-    const url = URL.createObjectURL(first);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
+    try {
+      const { imageToCanvas } = await import("@/lib/image");
+      const canvas = await imageToCanvas(first);
 
       const result = detectDocumentQuad(canvas, mode);
       const finalQuad = result.detected ? result.quad : getDefaultQuad(canvas.width, canvas.height, mode);
@@ -397,12 +390,9 @@ export function CameraScannerModal({
       setActiveEditingPageIndex(null);
       setViewState("adjust");
       toast.success("Image imported for scanning!");
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
+    } catch {
       toast.error("Failed to load image from gallery.");
-    };
-    img.src = url;
+    }
   };
 
   // Render Adjust/Review Screen Canvas
@@ -651,6 +641,46 @@ export function CameraScannerModal({
     }
   };
 
+  // Rotate captured raw image and boundary quad 90 degrees clockwise
+  const handleRotateCaptured = () => {
+    if (!capturedRawCanvas || !editingQuad) return;
+    const oldW = capturedRawCanvas.width;
+    const oldH = capturedRawCanvas.height;
+
+    const newCanvas = document.createElement("canvas");
+    newCanvas.width = oldH;
+    newCanvas.height = oldW;
+    const ctx = newCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.translate(oldH / 2, oldW / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(capturedRawCanvas, -oldW / 2, -oldH / 2);
+
+    // Rotate points 90 deg clockwise: (x, y) -> (oldH - y, x)
+    const rotPt = (p: Point): Point => ({
+      x: Math.max(0, Math.min(oldH, Math.round(oldH - p.y))),
+      y: Math.max(0, Math.min(oldW, Math.round(p.x))),
+    });
+
+    const newQuad: Quad = {
+      tl: rotPt(editingQuad.bl),
+      tr: rotPt(editingQuad.tl),
+      br: rotPt(editingQuad.tr),
+      bl: rotPt(editingQuad.br),
+    };
+
+    setCapturedRawCanvas(newCanvas);
+    setEditingQuad(newQuad);
+    if (detectedQuad) {
+      setDetectedQuad({
+        tl: rotPt(detectedQuad.bl),
+        tr: rotPt(detectedQuad.tl),
+        br: rotPt(detectedQuad.tr),
+        bl: rotPt(detectedQuad.br),
+      });
+    }
+  };
+
   // Retake current frame
   const handleRetake = () => {
     setCapturedRawCanvas(null);
@@ -760,6 +790,43 @@ export function CameraScannerModal({
       const [item] = copy.splice(index, 1);
       copy.splice(target, 0, item);
       return copy;
+    });
+  };
+
+  // Rotate a scanned page 90 degrees clockwise in the tray
+  const handleRotatePage = (index: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setPages((prev) => {
+      const page = prev[index];
+      if (!page) return prev;
+
+      const rotateCanvas90 = (src: HTMLCanvasElement): HTMLCanvasElement => {
+        const dst = document.createElement("canvas");
+        dst.width = src.height;
+        dst.height = src.width;
+        const ctx = dst.getContext("2d");
+        if (ctx) {
+          ctx.translate(dst.width / 2, dst.height / 2);
+          ctx.rotate(Math.PI / 2);
+          ctx.drawImage(src, -src.width / 2, -src.height / 2);
+        }
+        return dst;
+      };
+
+      const newWarped = rotateCanvas90(page.warpedCanvas);
+      const newFiltered = rotateCanvas90(page.filteredCanvas);
+      const newPreviewUrl = newFiltered.toDataURL("image/jpeg", 0.7);
+
+      URL.revokeObjectURL(page.previewUrl);
+
+      const next = [...prev];
+      next[index] = {
+        ...page,
+        warpedCanvas: newWarped,
+        filteredCanvas: newFiltered,
+        previewUrl: newPreviewUrl,
+      };
+      return next;
     });
   };
 
@@ -1076,6 +1143,16 @@ export function CameraScannerModal({
                   <Maximize2 className="h-3.5 w-3.5 mr-1" />
                   {t("tools.photoToPdf.fullPage")}
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800 text-xs"
+                  onClick={handleRotateCaptured}
+                  title={t("common.rotate") || "Rotate 90°"}
+                >
+                  <RotateCw className="h-3.5 w-3.5 mr-1 text-sky-400" />
+                  {t("common.rotate") || "Rotate"}
+                </Button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1132,16 +1209,28 @@ export function CameraScannerModal({
                     className="h-28 w-full object-cover"
                   />
                   <div className="p-1.5 flex items-center justify-between text-[11px] bg-neutral-950/80">
-                    <span className="truncate max-w-[50px] font-medium">{p.name}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeletePage(p.id, e)}
-                      className="text-neutral-400 hover:text-red-400"
-                      aria-label="Delete page"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <span className="truncate max-w-[42px] font-medium">{p.name}</span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={(e) => handleRotatePage(idx, e)}
+                        className="text-neutral-400 hover:text-sky-400 p-0.5"
+                        aria-label="Rotate page 90 degrees"
+                        title="Rotate 90°"
+                      >
+                        <RotateCw className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDeletePage(p.id, e)}
+                        className="text-neutral-400 hover:text-red-400 p-0.5"
+                        aria-label="Delete page"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
+
                   {/* Reorder buttons */}
                   <div className="absolute top-1 right-1 flex flex-col gap-1 bg-black/60 rounded p-0.5">
                     {idx > 0 && (

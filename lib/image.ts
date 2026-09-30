@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import type { PhotoPdfOptions, PhotoPdfQuality } from "@/types/conversion";
 import {
   detectFileSignature,
+  getExifOrientation,
   parseImageDimensionsFromBytes,
 } from "./file-type";
 
@@ -44,10 +45,69 @@ export function detectImageMime(buffer: ArrayBuffer, fallbackType: string, filen
   return fallbackType || "image/jpeg";
 }
 
+function applyExifOrientation(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  orientation: number
+): { canvas: HTMLCanvasElement; width: number; height: number } {
+  const canvas = document.createElement("canvas");
+  const is90or270 = orientation === 5 || orientation === 6 || orientation === 7 || orientation === 8;
+  const targetW = is90or270 ? height : width;
+  const targetH = is90or270 ? width : height;
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { canvas, width, height };
+
+  switch (orientation) {
+    case 2: // Horizontal flip
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(source, 0, 0);
+      break;
+    case 3: // 180 deg
+      ctx.translate(width, height);
+      ctx.rotate(Math.PI);
+      ctx.drawImage(source, 0, 0);
+      break;
+    case 4: // Vertical flip
+      ctx.translate(0, height);
+      ctx.scale(1, -1);
+      ctx.drawImage(source, 0, 0);
+      break;
+    case 5: // Vertical flip + 90 deg rotate
+      ctx.rotate(0.5 * Math.PI);
+      ctx.scale(1, -1);
+      ctx.drawImage(source, 0, -height);
+      break;
+    case 6: // 90 deg CW
+      ctx.translate(height, 0);
+      ctx.rotate(0.5 * Math.PI);
+      ctx.drawImage(source, 0, 0);
+      break;
+    case 7: // Horizontal flip + 90 deg rotate
+      ctx.rotate(0.5 * Math.PI);
+      ctx.translate(width, -height);
+      ctx.scale(-1, 1);
+      ctx.drawImage(source, 0, 0);
+      break;
+    case 8: // 270 deg CW (90 deg CCW)
+      ctx.translate(0, width);
+      ctx.rotate(-0.5 * Math.PI);
+      ctx.drawImage(source, 0, 0);
+      break;
+    default:
+      ctx.drawImage(source, 0, 0);
+  }
+
+  return { canvas, width: targetW, height: targetH };
+}
+
 /**
  * Resilient image decoder following the required 4-tier fallback order:
  * 1. createImageBitmap (with EXIF orientation fallback to normal)
- * 2. Object URL + HTMLImageElement (with byte-signature corrected MIME Blob)
+ * 2. Object URL + HTMLImageElement (with byte-signature corrected MIME Blob and EXIF rotation check)
  * 3. FileReader / Data URL + HTMLImageElement
  * 4. Byte/signature detection as last resort with informative error messages
  */
@@ -87,7 +147,7 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
     }
   }
 
-  // Read array buffer to handle Android ContentProvider streams and detect real MIME
+  // Read array buffer to handle Android ContentProvider streams, detect real MIME, and check EXIF
   let buffer: ArrayBuffer;
   try {
     buffer = await fileOrBlob.arrayBuffer();
@@ -97,6 +157,9 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
 
   const sig = detectFileSignature(buffer);
   const detectedMime = sig.kind !== "unknown" ? sig.mime : detectImageMime(buffer, fileOrBlob.type, fileName);
+  const exifOrientation = getExifOrientation(buffer);
+  const rawDims = parseImageDimensionsFromBytes(buffer);
+
   // Ensure typed blob so browsers won't reject decoding generic application/octet-stream
   const typedBlob = fileOrBlob.type === detectedMime ? fileOrBlob : new Blob([buffer], { type: detectedMime });
 
@@ -118,6 +181,25 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
       try {
         const bitmap = await createImageBitmap(typedBlob);
         if (bitmap && bitmap.width > 0 && bitmap.height > 0) {
+          if (
+            exifOrientation > 1 &&
+            rawDims &&
+            rawDims.width !== rawDims.height &&
+            (exifOrientation === 6 || exifOrientation === 8) &&
+            rawDims.width === bitmap.width
+          ) {
+            const oriented = applyExifOrientation(bitmap, bitmap.width, bitmap.height, exifOrientation);
+            bitmap.close?.();
+            return {
+              source: oriented.canvas,
+              width: oriented.width,
+              height: oriented.height,
+              cleanup: () => {
+                oriented.canvas.width = 0;
+                oriented.canvas.height = 0;
+              },
+            };
+          }
           return {
             source: bitmap,
             width: bitmap.width,
@@ -154,6 +236,26 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
     const height = img.naturalHeight || img.height;
 
     if (width > 0 && height > 0) {
+      if (
+        exifOrientation > 1 &&
+        rawDims &&
+        rawDims.width !== rawDims.height &&
+        (exifOrientation === 6 || exifOrientation === 8) &&
+        rawDims.width === width
+      ) {
+        const oriented = applyExifOrientation(img, width, height, exifOrientation);
+        URL.revokeObjectURL(objectUrl);
+        return {
+          source: oriented.canvas,
+          width: oriented.width,
+          height: oriented.height,
+          cleanup: () => {
+            oriented.canvas.width = 0;
+            oriented.canvas.height = 0;
+          },
+        };
+      }
+
       return {
         source: img,
         width,
@@ -186,6 +288,25 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
     const height = img.naturalHeight || img.height;
 
     if (width > 0 && height > 0) {
+      if (
+        exifOrientation > 1 &&
+        rawDims &&
+        rawDims.width !== rawDims.height &&
+        (exifOrientation === 6 || exifOrientation === 8) &&
+        rawDims.width === width
+      ) {
+        const oriented = applyExifOrientation(img, width, height, exifOrientation);
+        return {
+          source: oriented.canvas,
+          width: oriented.width,
+          height: oriented.height,
+          cleanup: () => {
+            oriented.canvas.width = 0;
+            oriented.canvas.height = 0;
+          },
+        };
+      }
+
       return {
         source: img,
         width,
@@ -196,6 +317,7 @@ export async function decodeImageSource(fileOrBlob: File | Blob): Promise<Decode
   } catch {
     // Proceed to Tier 4
   }
+
 
   // Tier 4: Byte/signature detection as last resort with informative error messages
   if (sig.kind === "heic") {
@@ -235,17 +357,36 @@ export async function validateImageFile(file: File | Blob): Promise<{ valid: boo
 /**
  * Convert any image File or Blob to an HTMLCanvasElement with EXIF orientation and exact aspect ratio.
  */
-export async function imageToCanvas(fileOrBlob: File | Blob): Promise<HTMLCanvasElement> {
+export async function imageToCanvas(fileOrBlob: File | Blob, rotation = 0): Promise<HTMLCanvasElement> {
   const decoded = await decodeImageSource(fileOrBlob);
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  const is90or270 = normalizedRotation === 90 || normalizedRotation === 270;
+  const targetW = is90or270 ? decoded.height : decoded.width;
+  const targetH = is90or270 ? decoded.width : decoded.height;
+
   const canvas = document.createElement("canvas");
-  canvas.width = decoded.width;
-  canvas.height = decoded.height;
+  canvas.width = targetW;
+  canvas.height = targetH;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) {
     decoded.cleanup();
     throw new Error("Could not initialize canvas context.");
   }
-  ctx.drawImage(decoded.source, 0, 0, decoded.width, decoded.height);
+
+  if (normalizedRotation === 0) {
+    ctx.drawImage(decoded.source, 0, 0, decoded.width, decoded.height);
+  } else {
+    ctx.translate(targetW / 2, targetH / 2);
+    ctx.rotate((normalizedRotation * Math.PI) / 180);
+    ctx.drawImage(
+      decoded.source,
+      -decoded.width / 2,
+      -decoded.height / 2,
+      decoded.width,
+      decoded.height
+    );
+  }
+
   decoded.cleanup();
   return canvas;
 }
@@ -285,7 +426,8 @@ export async function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): 
  */
 export async function imageToPdfEmbeddable(
   source: File | Blob | string,
-  quality = 0.92
+  quality = 0.92,
+  rotation = 0
 ): Promise<{ bytes: Uint8Array; format: "jpg" | "png"; width: number; height: number }> {
   let fileOrBlob: File | Blob;
 
@@ -300,7 +442,7 @@ export async function imageToPdfEmbeddable(
       bytes[i] = binary.charCodeAt(i);
     }
 
-    if (isPng || meta.includes("image/jpeg") || meta.includes("image/jpg")) {
+    if (rotation === 0 && (isPng || meta.includes("image/jpeg") || meta.includes("image/jpg"))) {
       const sig = detectFileSignature(bytes);
       if (sig.kind === "png") {
         const dims = parseImageDimensionsFromBytes(bytes);
@@ -315,7 +457,7 @@ export async function imageToPdfEmbeddable(
     fileOrBlob = source;
   }
 
-  const canvas = await imageToCanvas(fileOrBlob);
+  const canvas = await imageToCanvas(fileOrBlob, rotation);
   const width = canvas.width;
   const height = canvas.height;
 
@@ -349,7 +491,11 @@ export async function imageToPdfEmbeddable(
   return { bytes, format, width, height };
 }
 
-async function preparePhoto(file: File, quality: PhotoPdfQuality): Promise<PreparedPhoto> {
+async function preparePhoto(
+  file: File,
+  quality: PhotoPdfQuality,
+  rotation = 0
+): Promise<PreparedPhoto> {
   const decoded = await decodeImageSource(file);
   const imageWidth = decoded.width;
   const imageHeight = decoded.height;
@@ -388,9 +534,14 @@ async function preparePhoto(file: File, quality: PhotoPdfQuality): Promise<Prepa
     canvasHeight = Math.max(1, Math.round(canvasHeight * limitScale));
   }
 
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  const is90or270 = normalizedRotation === 90 || normalizedRotation === 270;
+  const finalWidth = is90or270 ? canvasHeight : canvasWidth;
+  const finalHeight = is90or270 ? canvasWidth : canvasHeight;
+
   const canvas = document.createElement("canvas");
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
+  canvas.width = finalWidth;
+  canvas.height = finalHeight;
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) {
     decoded.cleanup();
@@ -399,10 +550,28 @@ async function preparePhoto(file: File, quality: PhotoPdfQuality): Promise<Prepa
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  ctx.fillRect(0, 0, finalWidth, finalHeight);
 
-  // Preserve complete image, never crop, exact aspect ratio
-  ctx.drawImage(decoded.source, 0, 0, imageWidth, imageHeight, 0, 0, canvasWidth, canvasHeight);
+  if (normalizedRotation === 0) {
+    // Preserve complete image, never crop, exact aspect ratio
+    ctx.drawImage(decoded.source, 0, 0, imageWidth, imageHeight, 0, 0, canvasWidth, canvasHeight);
+  } else {
+    ctx.save();
+    ctx.translate(finalWidth / 2, finalHeight / 2);
+    ctx.rotate((normalizedRotation * Math.PI) / 180);
+    ctx.drawImage(
+      decoded.source,
+      0,
+      0,
+      imageWidth,
+      imageHeight,
+      -canvasWidth / 2,
+      -canvasHeight / 2,
+      canvasWidth,
+      canvasHeight
+    );
+    ctx.restore();
+  }
   decoded.cleanup();
 
   const isPng = (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) && quality === "original";
@@ -428,11 +597,13 @@ async function preparePhoto(file: File, quality: PhotoPdfQuality): Promise<Prepa
   canvas.width = 0;
   canvas.height = 0;
 
-  return { bytes, width: canvasWidth, height: canvasHeight, kind };
+  return { bytes, width: finalWidth, height: finalHeight, kind };
 }
 
+export type PhotoToPdfInput = File | { file: File; rotation?: number };
+
 export async function imagesToPdf(
-  files: File[],
+  files: PhotoToPdfInput[],
   options: PhotoPdfOptions = { quality: "medium" },
   onImageError?: (file: File, error: Error) => void
 ): Promise<Uint8Array> {
@@ -445,10 +616,13 @@ export async function imagesToPdf(
   let embeddedCount = 0;
   let lastError: Error | null = null;
 
-  for (const file of files) {
+  for (const entry of files) {
+    const file = entry instanceof File ? entry : entry.file;
+    const rotation = entry instanceof File ? 0 : (entry.rotation || 0) % 360;
+
     let prepared: PreparedPhoto;
     try {
-      prepared = await preparePhoto(file, quality);
+      prepared = await preparePhoto(file, quality, rotation);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(`Could not read image "${file.name}".`);
       lastError = err;
@@ -482,3 +656,4 @@ export async function imagesToPdf(
 
   return pdf.save({ useObjectStreams: false });
 }
+

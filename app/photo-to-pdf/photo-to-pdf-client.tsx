@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Camera, Images, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, Images, RotateCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PdfToolLayout } from "@/components/pdf/pdf-tool-layout";
 import { FileUpload } from "@/components/pdf/file-upload";
@@ -23,7 +23,7 @@ import { CameraScannerModal } from "@/components/scanner/camera-scanner-modal";
 
 export function PhotoToPdfClient() {
   const t = useT();
-  const { items, add, remove, clear, move } = useFileQueue<ImageFileItem>();
+  const { items, add, remove, clear, move, rotate } = useFileQueue<ImageFileItem>();
   const [loading, setLoading] = useState(false);
   const [quality, setQuality] = useState<PhotoPdfQuality>("medium");
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -132,7 +132,10 @@ export function PhotoToPdfClient() {
     setLoading(true);
     try {
       const bytes = await imagesToPdf(
-        items.map((item) => item.file),
+        items.map((item) => ({
+          file: item.file,
+          rotation: item.rotation || 0,
+        })),
         { quality },
         (failedFile) => {
           toast.error(t("tools.photoToPdf.decodeFailed", { name: failedFile.name }));
@@ -207,45 +210,106 @@ export function PhotoToPdfClient() {
               </Button>
             </div>
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item, index) => (
-                <li key={item.id} className="overflow-hidden rounded-xl border bg-card">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={item.previewUrl} alt={item.name} className="h-36 w-full object-cover sm:h-40" />
-                  <div className="flex items-center justify-between gap-2 p-3">
-                    <p className="truncate text-sm">{item.name}</p>
-                    <div className="flex shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Move up"
-                        disabled={loading || index === 0}
-                        onClick={() => move(item.id, -1)}
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Move down"
-                        disabled={loading || index === items.length - 1}
-                        onClick={() => move(item.id, 1)}
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Remove image"
+              {items.map((item, index) => {
+                const rotation = (item.rotation || 0) % 360;
+                return (
+                  <li
+                    key={item.id}
+                    className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:shadow-md"
+                  >
+                    {/* Centered square inner box prevents overflow and distortion when rotated 90/180/270 */}
+                    <div className="relative flex h-40 w-full items-center justify-center overflow-hidden bg-muted/40 p-2 sm:h-44">
+                      <div className="relative flex h-36 w-36 items-center justify-center sm:h-40 sm:w-40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.previewUrl}
+                          alt={item.name}
+                          style={{
+                            transform: `rotate(${rotation}deg)`,
+                            transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                          }}
+                          className="max-h-full max-w-full object-contain select-none pointer-events-none drop-shadow-sm"
+                        />
+                      </div>
+
+                      {/* Quick-rotate overlay button for mobile and desktop */}
+                      <button
+                        type="button"
+                        onClick={() => rotate(item.id)}
                         disabled={loading}
-                        onClick={() => handleRemove(item.id)}
+                        className="absolute top-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm shadow-md transition-transform hover:scale-110 active:scale-95 hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 touch-manipulation"
+                        aria-label={`Rotate ${item.name} 90 degrees clockwise`}
+                        title={t("common.rotate") || "Rotate 90°"}
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <RotateCw className="h-4 w-4" />
+                      </button>
+
+                      {/* Rotation angle badge when rotated */}
+                      {rotation > 0 && (
+                        <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm shadow">
+                          {rotation}°
+                        </span>
+                      )}
+
+                      {/* Page sequence badge */}
+                      <span className="absolute top-2 left-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white/90 backdrop-blur-sm">
+                        #{index + 1}
+                      </span>
                     </div>
-                  </div>
-                </li>
-              ))}
+
+                    <div className="flex items-center justify-between gap-2 p-3">
+                      <p className="truncate text-sm font-medium" title={item.name}>
+                        {item.name}
+                      </p>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-primary hover:bg-primary/10"
+                          aria-label={`Rotate ${item.name} 90 degrees clockwise`}
+                          title={`${t("common.rotate") || "Rotate"} (${rotation}°)`}
+                          disabled={loading}
+                          onClick={() => rotate(item.id)}
+                        >
+                          <RotateCw className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Move up"
+                          disabled={loading || index === 0}
+                          onClick={() => move(item.id, -1)}
+                        >
+                          <ArrowUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Move down"
+                          disabled={loading || index === items.length - 1}
+                          onClick={() => move(item.id, 1)}
+                        >
+                          <ArrowDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          aria-label="Remove image"
+                          disabled={loading}
+                          onClick={() => handleRemove(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+
             <Card>
               <CardContent className="grid gap-2 p-4 sm:max-w-xs">
                 <Label htmlFor="photo-quality">{t("tools.photoToPdf.quality")}</Label>

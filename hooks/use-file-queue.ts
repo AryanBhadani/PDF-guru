@@ -32,7 +32,26 @@ export function useFileQueue<T extends { id: string }>() {
     });
   }, []);
 
-  return { items, setAll, add, remove, clear, move };
+  const update = useCallback((id: string, patch: Partial<T>) => {
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  }, []);
+
+  const rotate = useCallback((id: string, step = 90) => {
+    setItems((current) =>
+      current.map((item) => {
+        if (item.id !== id) return item;
+        const currentRot = typeof (item as { rotation?: number }).rotation === "number"
+          ? (item as { rotation?: number }).rotation!
+          : 0;
+        const nextRot = (((currentRot + step) % 360) + 360) % 360;
+        return { ...item, rotation: nextRot };
+      })
+    );
+  }, []);
+
+  return { items, setAll, add, remove, clear, move, update, rotate };
 }
 
 export { createId };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, FileImage, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileImage, RotateCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PdfToolLayout } from "@/components/pdf/pdf-tool-layout";
 import { FileUpload } from "@/components/pdf/file-upload";
@@ -44,7 +44,7 @@ const defaultOptions: ImageToPdfOptions = {
 
 export function ImageToPdfClient() {
   const t = useT();
-  const { items, add, remove, clear, move } = useFileQueue<ImageFileItem>();
+  const { items, add, remove, clear, move, rotate } = useFileQueue<ImageFileItem>();
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<ImageToPdfOptions>(defaultOptions);
   const itemsRef = useRef(items);
@@ -126,7 +126,10 @@ export function ImageToPdfClient() {
     try {
       const { createAdvancedImagePdf } = await import("@/lib/image-to-pdf");
       const bytes = await createAdvancedImagePdf(
-        items.map((item) => item.file),
+        items.map((item) => ({
+          file: item.file,
+          rotation: item.rotation || 0,
+        })),
         options
       );
       downloadPdf(bytes, "pdf-guru-images.pdf");
@@ -170,34 +173,107 @@ export function ImageToPdfClient() {
                 </Button>
               </div>
               <ul className="grid gap-3 sm:grid-cols-2">
-                {items.map((item, index) => (
-                  <li key={item.id} className="overflow-hidden rounded-xl border bg-card">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.previewUrl} alt={item.name} className="h-32 w-full object-cover" />
-                    <div className="flex items-center justify-between gap-2 p-2">
-                      <p className="truncate text-xs">{item.name}</p>
-                      <div className="flex shrink-0">
-                        <Button variant="ghost" size="icon" disabled={loading || index === 0} onClick={() => move(item.id, -1)}>
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          disabled={loading || index === items.length - 1}
-                          onClick={() => move(item.id, 1)}
+                {items.map((item, index) => {
+                  const rotation = (item.rotation || 0) % 360;
+                  return (
+                    <li
+                      key={item.id}
+                      className="group relative overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:shadow-md"
+                    >
+                      <div className="relative flex h-36 w-full items-center justify-center overflow-hidden bg-muted/40 p-2 sm:h-40">
+                        <div className="relative flex h-32 w-32 items-center justify-center sm:h-36 sm:w-36">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.previewUrl}
+                            alt={item.name}
+                            style={{
+                              transform: `rotate(${rotation}deg)`,
+                              transition: "transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                            }}
+                            className="max-h-full max-w-full object-contain select-none pointer-events-none drop-shadow-sm"
+                          />
+                        </div>
+
+                        {/* Quick Rotate button for mobile/desktop */}
+                        <button
+                          type="button"
+                          onClick={() => rotate(item.id)}
+                          disabled={loading}
+                          className="absolute top-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm shadow-md transition-transform hover:scale-110 active:scale-95 hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 touch-manipulation"
+                          aria-label={`Rotate ${item.name} 90 degrees clockwise`}
+                          title={t("common.rotate") || "Rotate 90°"}
                         >
-                          <ArrowDown className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" disabled={loading} onClick={() => handleRemove(item.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          <RotateCw className="h-3.5 w-3.5" />
+                        </button>
+
+                        {/* Rotation angle badge */}
+                        {rotation > 0 && (
+                          <span className="absolute bottom-2 left-2 rounded-md bg-black/65 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm shadow">
+                            {rotation}°
+                          </span>
+                        )}
+
+                        {/* Page number badge */}
+                        <span className="absolute top-2 left-2 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+                          #{index + 1}
+                        </span>
                       </div>
-                    </div>
-                  </li>
-                ))}
+
+                      <div className="flex items-center justify-between gap-2 p-2.5">
+                        <p className="truncate text-xs font-medium" title={item.name}>
+                          {item.name}
+                        </p>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-primary hover:bg-primary/10"
+                            aria-label={`Rotate ${item.name} 90 degrees clockwise`}
+                            title={`${t("common.rotate") || "Rotate"} (${rotation}°)`}
+                            disabled={loading}
+                            onClick={() => rotate(item.id)}
+                          >
+                            <RotateCw className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={loading || index === 0}
+                            aria-label="Move up"
+                            onClick={() => move(item.id, -1)}
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            disabled={loading || index === items.length - 1}
+                            aria-label="Move down"
+                            onClick={() => move(item.id, 1)}
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={loading}
+                            aria-label="Remove image"
+                            onClick={() => handleRemove(item.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
+
           <DownloadButton
             label={t("tools.imageToPdf.convert")}
             loadingLabel={t("tools.imageToPdf.converting")}

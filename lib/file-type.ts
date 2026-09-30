@@ -381,3 +381,85 @@ export function parseImageDimensionsFromBytes(
 
   return null;
 }
+
+/**
+ * Reads EXIF orientation from JPEG bytes.
+ * Returns orientation tag value (1-8), where 1 = normal (0 deg).
+ * 3 = 180 deg, 6 = 90 deg CW, 8 = 270 deg CW.
+ */
+export function getExifOrientation(input: ArrayBuffer | Uint8Array): number {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.length < 14) return 1;
+
+  // JPEG must start with SOI marker (0xFF, 0xD8)
+  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return 1;
+
+  let offset = 2;
+  const length = bytes.length;
+
+  while (offset + 4 < length) {
+    if (bytes[offset] !== 0xff) {
+      offset++;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+
+    // Marker SOS (0xDA) or EOI (0xD9) signals start of scan or end of image
+    if (marker === 0xda || marker === 0xd9) break;
+
+    // Segment length includes the 2 length bytes
+    const segmentLength = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (segmentLength < 2 || offset + 2 + segmentLength > length) break;
+
+    // Check APP1 marker (0xFF, 0xE1)
+    if (marker === 0xe1 && offset + 10 < length) {
+      const app1Offset = offset + 4;
+      // Check for Exif header 'Exif\0\0' (0x45, 0x78, 0x69, 0x66, 0x00, 0x00)
+      if (
+        bytes[app1Offset] === 0x45 &&
+        bytes[app1Offset + 1] === 0x78 &&
+        bytes[app1Offset + 2] === 0x69 &&
+        bytes[app1Offset + 3] === 0x66 &&
+        bytes[app1Offset + 4] === 0x00 &&
+        bytes[app1Offset + 5] === 0x00
+      ) {
+        const tiffOffset = app1Offset + 6;
+        if (tiffOffset + 8 <= length) {
+          const isLittleEndian = bytes[tiffOffset] === 0x49 && bytes[tiffOffset + 1] === 0x49; // 'II'
+          const isBigEndian = bytes[tiffOffset] === 0x4d && bytes[tiffOffset + 1] === 0x4d; // 'MM'
+
+          if (isLittleEndian || isBigEndian) {
+            const view = new DataView(bytes.buffer, bytes.byteOffset + tiffOffset, segmentLength - 8);
+
+            // Verify TIFF magic number 42 (0x002A)
+            const magic = view.getUint16(2, isLittleEndian);
+            if (magic === 0x002a) {
+              const firstIfdOffset = view.getUint32(4, isLittleEndian);
+              if (firstIfdOffset + 2 <= view.byteLength) {
+                const entryCount = view.getUint16(firstIfdOffset, isLittleEndian);
+                let entryOffset = firstIfdOffset + 2;
+
+                for (let i = 0; i < entryCount; i++) {
+                  if (entryOffset + 12 > view.byteLength) break;
+                  const tag = view.getUint16(entryOffset, isLittleEndian);
+                  // Tag 0x0112 is Orientation
+                  if (tag === 0x0112) {
+                    const orientation = view.getUint16(entryOffset + 8, isLittleEndian);
+                    if (orientation >= 1 && orientation <= 8) {
+                      return orientation;
+                    }
+                  }
+                  entryOffset += 12;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    offset += 2 + segmentLength;
+  }
+
+  return 1;
+}
