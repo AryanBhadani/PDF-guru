@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
+  Android,
   Combine,
   Download,
   FileEdit,
@@ -261,6 +262,18 @@ export function HomePageClient() {
                 className="rounded-xl border-slate-700/80 bg-slate-900/60 px-6 text-sm font-medium text-slate-200 hover:bg-slate-800/80 hover:text-white hover:border-slate-600 transition-all h-12"
               >
                 <Link href="#tools">Explore Tools</Link>
+              </Button>
+
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="rounded-xl border-emerald-500/40 bg-emerald-950/40 px-6 text-sm font-medium text-emerald-300 hover:bg-emerald-950/60 hover:text-emerald-200 hover:border-emerald-500/60 transition-all h-12 gap-2"
+              >
+                <Link href="https://github.com/AryanBhadani/PDF-guru/releases/download/v1.0.0/PDF-Guru-signed.apk" target="_blank" rel="noopener noreferrer" className="gap-2">
+                  <Android className="h-4 w-4" />
+                  PDF Guru for Android
+                </Link>
               </Button>
             </div>
           </div>
