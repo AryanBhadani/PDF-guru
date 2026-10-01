@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { loadPdfJsDocument } from "@/lib/pdf-render";
 
 export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
@@ -9,7 +10,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
   const [loading, setLoading] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
 
   useEffect(() => {
     loadPdf();
@@ -47,7 +48,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
     }
   }
 
-  async function renderPage(num: number, doc: any = pdfDoc) {
+  async function renderPage(num: number, doc: PDFDocumentProxy | null = pdfDoc) {
     if (!doc || !canvasRef.current) return;
 
     try {
@@ -63,7 +64,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
       await page.render({ canvasContext: context, viewport }).promise;
       page.cleanup();
-    } catch (err) {
+    } catch {
       setError("Failed to render page");
     }
   }
