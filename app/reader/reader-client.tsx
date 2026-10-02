@@ -24,6 +24,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, localFile]);
 
   async function loadPdfFromUrl(url: string) {
