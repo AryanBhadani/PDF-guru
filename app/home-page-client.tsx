@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   ArrowRight,
   Smartphone,
+  BookOpen,
   Combine,
   Download,
   FileEdit,
@@ -33,6 +34,7 @@ const ICONS = {
   Images,
   Combine,
   Scissors,
+  BookOpen,
   Receipt,
   Sparkles,
   Presentation,
@@ -76,6 +78,12 @@ const TOOL_STYLES: Record<
     border: "border-rose-500/40",
     text: "text-rose-400",
     glow: "shadow-[0_0_18px_rgba(244,63,94,0.25)]",
+  },
+  pdfReader: {
+    bg: "bg-[#1a1a4a]",
+    border: "border-indigo-500/40",
+    text: "text-indigo-400",
+    glow: "shadow-[0_0_18px_rgba(99,102,241,0.25)]",
   },
   gstInvoice: {
     bg: "bg-[#3a2806]",

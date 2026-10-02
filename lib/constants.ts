@@ -54,6 +54,14 @@ export const CORE_TOOLS = [
     i18n: "splitPdf",
   },
   {
+    href: "/reader",
+    title: "PDF Reader",
+    description: "View PDF pages with zoom and navigation controls in your browser.",
+    icon: "BookOpen",
+    navLabel: "PDF Reader",
+    i18n: "pdfReader",
+  },
+  {
     href: "/gst-invoice",
     title: "GST Invoice",
     description: "Create professional GST invoices with automatic tax calculation.",

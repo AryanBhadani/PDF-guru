@@ -3,32 +3,39 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { loadPdfJsDocument } from "@/lib/pdf-render";
+import { Upload } from "lucide-react";
 
 export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  const [scale, setScale] = useState(1.5);
+  const [localFile, setLocalFile] = useState<File | null>(null);
 
   useEffect(() => {
-    loadPdf();
-  }, [fileUrl]);
+    if (localFile) {
+      loadPdfFromFile(localFile);
+    } else if (fileUrl) {
+      loadPdfFromUrl(fileUrl);
+    } else {
+      setLoading(false);
+    }
+  }, [fileUrl, localFile]);
 
-  async function loadPdf() {
+  async function loadPdfFromUrl(url: string) {
     try {
       setLoading(true);
       setError(null);
 
-      if (!fileUrl) {
-        throw new Error("No PDF file specified");
-      }
-
-      // Fetch PDF from URL (works for both web URLs and Android asset loader URLs)
-      const response = await fetch(fileUrl);
+      console.log("ReaderClient: Fetching PDF from URL:", url);
+      const response = await fetch(url);
+      
       if (!response.ok) {
-        throw new Error("Failed to load PDF file");
+        throw new Error(`Failed to load PDF file (status: ${response.status})`);
       }
       
       const blob = await response.blob();
@@ -42,6 +49,28 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       
       await renderPage(1, pdf);
     } catch (err) {
+      console.error("ReaderClient: Error loading PDF:", err);
+      setError(err instanceof Error ? err.message : "Failed to load PDF");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadPdfFromFile(file: File) {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log("ReaderClient: Loading local PDF file:", file.name);
+      const pdf = await loadPdfJsDocument(file);
+      
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+      setPageNumber(1);
+      
+      await renderPage(1, pdf);
+    } catch (err) {
+      console.error("ReaderClient: Error loading PDF:", err);
       setError(err instanceof Error ? err.message : "Failed to load PDF");
     } finally {
       setLoading(false);
@@ -53,7 +82,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
     try {
       const page = await doc.getPage(num);
-      const viewport = page.getViewport({ scale: 1.5 });
+      const viewport = page.getViewport({ scale });
       
       const canvas = canvasRef.current;
       const context = canvas.getContext("2d");
@@ -75,6 +104,61 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       setPageNumber(newPage);
       await renderPage(newPage, pdfDoc);
     }
+  }
+
+  async function changeScale(newScale: number) {
+    if (newScale >= 0.5 && newScale <= 3 && pdfDoc) {
+      setScale(newScale);
+      await renderPage(pageNumber, pdfDoc);
+    }
+  }
+
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file && file.type === "application/pdf") {
+      setLocalFile(file);
+    } else if (file) {
+      setError("Please select a PDF file");
+    }
+  }
+
+  // Show file upload UI if no PDF is loaded
+  if (!pdfDoc && !loading && !error) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Upload className="w-8 h-8 text-blue-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">PDF Reader</h2>
+            <p className="text-gray-600 mb-6">Upload a PDF file to view its pages</p>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Select PDF File
+            </button>
+            
+            <button
+              onClick={() => window.location.href = "/"}
+              className="w-full mt-3 bg-gray-200 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            >
+              Back to Homepage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -100,8 +184,18 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
           <h2 className="text-xl font-semibold mb-2">Error Loading PDF</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
+            onClick={() => {
+              setError(null);
+              setPdfDoc(null);
+              setLocalFile(null);
+            }}
+            className="mr-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Try Another File
+          </button>
+          <button
             onClick={() => window.location.href = "/"}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
           >
             Go to Homepage
           </button>
@@ -112,7 +206,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <div className="bg-white shadow-md p-4 flex items-center justify-between">
+      <div className="bg-white shadow-md p-4 flex items-center justify-between flex-wrap gap-2">
         <button
           onClick={() => window.location.href = "/"}
           className="text-gray-600 hover:text-gray-900"
@@ -121,11 +215,12 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>
-        <div className="flex items-center gap-4">
+        
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => changePage(-1)}
             disabled={pageNumber <= 1}
-            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 text-sm"
           >
             Previous
           </button>
@@ -135,13 +230,31 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
           <button
             onClick={() => changePage(1)}
             disabled={pageNumber >= totalPages}
-            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50"
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 text-sm"
           >
             Next
           </button>
         </div>
-        <div className="w-6"></div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => changeScale(scale - 0.25)}
+            disabled={scale <= 0.5}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 text-sm"
+          >
+            Zoom Out
+          </button>
+          <span className="text-sm w-12 text-center">{Math.round(scale * 100)}%</span>
+          <button
+            onClick={() => changeScale(scale + 0.25)}
+            disabled={scale >= 3}
+            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 text-sm"
+          >
+            Zoom In
+          </button>
+        </div>
       </div>
+      
       <div className="flex-1 overflow-auto p-4 flex justify-center">
         <canvas ref={canvasRef} className="shadow-lg" />
       </div>
