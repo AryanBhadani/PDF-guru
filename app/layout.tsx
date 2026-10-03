@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   applicationName: APP_NAME,
-  metadataBase: new URL("https://pdfguru.app"),
+  metadataBase: new URL("https://pdf-guru-j5ms-alpha.vercel.app"),
   manifest: "/manifest.webmanifest",
   openGraph: {
     title: `${APP_NAME} – Free Online PDF Tools`,

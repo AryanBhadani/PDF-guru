@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 
-const SITE_URL = "https://pdfguru.app";
+const SITE_URL = "https://pdf-guru-j5ms-alpha.vercel.app";
 
 export function createPageMetadata(title: string, description: string, path = "/"): Metadata {
   const fullTitle = title.includes(APP_NAME) ? title : `${title} | ${APP_NAME}`;
