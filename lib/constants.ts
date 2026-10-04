@@ -1,7 +1,7 @@
 export const APP_NAME = "PDF Guru";
 export const APP_TAGLINE = "All Your PDF Tools in One Place";
 export const APP_DESCRIPTION =
-  "Convert, merge, split, create invoices, summarize, compress, mask, and clean PDFs quickly and easily.";
+  "Free online PDF tools to merge, split, compress, convert, and edit PDFs. Process files securely in your browser with no server uploads. Perfect for students, professionals, and businesses.";
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 export const MAX_IMAGE_COUNT = 50;

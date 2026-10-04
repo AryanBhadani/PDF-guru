@@ -247,7 +247,7 @@ export function HomePageClient() {
 
             {/* Subtitle */}
             <p className="max-w-lg text-sm sm:text-base text-slate-300/80 leading-relaxed font-normal">
-              Convert, merge, split, create invoices, summarize, compress, mask, and clean PDFs quickly and easily.
+              Convert, merge, split, compress, and edit PDFs directly in your browser. No file uploads to servers—your documents stay private on your device.
             </p>
 
             {/* CTA Buttons */}
