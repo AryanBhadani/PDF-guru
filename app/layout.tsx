@@ -40,6 +40,15 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
   },
+  other: {
+    "application/ld+json": JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: APP_NAME,
+      description: APP_DESCRIPTION,
+      url: "https://pdf-guru-j5ms-alpha.vercel.app",
+    }),
+  },
 };
 
 export const viewport: Viewport = {

@@ -239,15 +239,15 @@ export function HomePageClient() {
 
             {/* Main Title */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
-              PDF Tools <br />
+              Free Online PDF Tools <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
-                Made Simple
+                Convert, Merge, Split & Edit
               </span>
             </h1>
 
             {/* Subtitle */}
             <p className="max-w-lg text-sm sm:text-base text-slate-300/80 leading-relaxed font-normal">
-              Convert, merge, split, compress, and edit PDFs directly in your browser. No file uploads to servers—your documents stay private on your device.
+              Merge PDF files, split documents, compress PDFs, convert images to PDF, and edit PDFs online. All processing happens in your browser—no server uploads, complete privacy.
             </p>
 
             {/* CTA Buttons */}
