@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { loadPdfJsDocument } from "@/lib/pdf-render";
-import { Upload } from "lucide-react";
+import { Upload, ArrowLeft } from "lucide-react";
 
 export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
-  const [scale, setScale] = useState(1.5);
   const [localFile, setLocalFile] = useState<File | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
 
   useEffect(() => {
     if (localFile) {
@@ -32,23 +32,20 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       setLoading(true);
       setError(null);
 
-      console.log("ReaderClient: Fetching PDF from URL:", url);
       const response = await fetch(url);
-      
       if (!response.ok) {
         throw new Error(`Failed to load PDF file (status: ${response.status})`);
       }
       
       const blob = await response.blob();
       const pdfData = new Uint8Array(await blob.arrayBuffer());
-
       const pdf = await loadPdfJsDocument(pdfData);
       
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
-      setPageNumber(1);
+      setCurrentPage(0);
       
-      await renderPage(1, pdf);
+      await renderAllPages(pdf);
     } catch (err) {
       console.error("ReaderClient: Error loading PDF:", err);
       setError(err instanceof Error ? err.message : "Failed to load PDF");
@@ -62,14 +59,13 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       setLoading(true);
       setError(null);
 
-      console.log("ReaderClient: Loading local PDF file:", file.name);
       const pdf = await loadPdfJsDocument(file);
       
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
-      setPageNumber(1);
+      setCurrentPage(0);
       
-      await renderPage(1, pdf);
+      await renderAllPages(pdf);
     } catch (err) {
       console.error("ReaderClient: Error loading PDF:", err);
       setError(err instanceof Error ? err.message : "Failed to load PDF");
@@ -78,39 +74,40 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
     }
   }
 
-  async function renderPage(num: number, doc: PDFDocumentProxy | null = pdfDoc) {
-    if (!doc || !canvasRef.current) return;
+  const calculateScale = useCallback(() => {
+    if (!containerRef.current) return 1;
+    const containerWidth = containerRef.current.clientWidth - 32; // Account for padding
+    return Math.max(0.5, Math.min(3, (containerWidth / 595) * window.devicePixelRatio));
+  }, []);
+
+  async function renderPage(num: number, doc: PDFDocumentProxy) {
+    const canvas = canvasRefs.current.get(num);
+    if (!canvas) return;
 
     try {
       const page = await doc.getPage(num);
-      const viewport = page.getViewport({ scale });
+      const scale = calculateScale();
+      const viewport = page.getViewport({ scale: scale / window.devicePixelRatio });
       
-      const canvas = canvasRef.current;
       const context = canvas.getContext("2d");
       if (!context) return;
 
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.width = Math.floor(viewport.width * window.devicePixelRatio);
+      canvas.height = Math.floor(viewport.height * window.devicePixelRatio);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
 
+      context.scale(window.devicePixelRatio, window.devicePixelRatio);
       await page.render({ canvasContext: context, viewport }).promise;
       page.cleanup();
-    } catch {
-      setError("Failed to render page");
+    } catch (err) {
+      console.error(`Failed to render page ${num}:`, err);
     }
   }
 
-  async function changePage(delta: number) {
-    const newPage = pageNumber + delta;
-    if (newPage >= 1 && newPage <= totalPages && pdfDoc) {
-      setPageNumber(newPage);
-      await renderPage(newPage, pdfDoc);
-    }
-  }
-
-  async function changeScale(newScale: number) {
-    if (newScale >= 0.5 && newScale <= 3 && pdfDoc) {
-      setScale(newScale);
-      await renderPage(pageNumber, pdfDoc);
+  async function renderAllPages(doc: PDFDocumentProxy) {
+    for (let num = 1; num <= doc.numPages; num++) {
+      await renderPage(num, doc);
     }
   }
 
@@ -123,14 +120,28 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
     }
   }
 
-  // Show file upload UI if no PDF is loaded
+  function handleTryAgain() {
+    setError(null);
+    setPdfDoc(null);
+    setLocalFile(null);
+    fileInputRef.current?.click();
+  }
+
+  function handleChooseAnother() {
+    setError(null);
+    setPdfDoc(null);
+    setLocalFile(null);
+    fileInputRef.current?.click();
+  }
+
+  // Show file upload UI if no PDF is loaded and no error
   if (!pdfDoc && !loading && !error) {
     return (
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center justify-center p-4">
         <div className="max-w-md w-full">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 text-center">
-            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Upload className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Upload className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">PDF Reader</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">Upload a PDF file to view its pages</p>
@@ -145,7 +156,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
             
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="w-full bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors font-medium"
             >
               Select PDF File
             </button>
@@ -182,23 +193,19 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">Error Loading PDF</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">Unable to load PDF</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please try another file.</p>
           <button
-            onClick={() => {
-              setError(null);
-              setPdfDoc(null);
-              setLocalFile(null);
-            }}
-            className="mr-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={handleTryAgain}
+            className="mr-2 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
           >
-            Try Another File
+            Try Again
           </button>
           <button
-            onClick={() => window.location.href = "/"}
+            onClick={handleChooseAnother}
             className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
           >
-            Go to Homepage
+            Choose Another File
           </button>
         </div>
       </div>
@@ -207,57 +214,65 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
-      <div className="bg-white dark:bg-gray-800 shadow-md p-4 flex items-center justify-between flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 shadow-sm px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
         <button
           onClick={() => window.location.href = "/"}
-          className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+          className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-2"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm font-medium">Back</span>
         </button>
         
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => changePage(-1)}
-            disabled={pageNumber <= 1}
-            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-gray-900 dark:text-gray-100">
-            Page {pageNumber} of {totalPages}
+        {totalPages > 0 && (
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            Page {currentPage + 1} / {totalPages}
           </span>
-          <button
-            onClick={() => changePage(1)}
-            disabled={pageNumber >= totalPages}
-            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            Next
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => changeScale(scale - 0.25)}
-            disabled={scale <= 0.5}
-            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            Zoom Out
-          </button>
-          <span className="text-sm w-12 text-center text-gray-900 dark:text-gray-100">{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => changeScale(scale + 0.25)}
-            disabled={scale >= 3}
-            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            Zoom In
-          </button>
-        </div>
+        )}
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium"
+        >
+          Open PDF
+        </button>
       </div>
       
-      <div className="flex-1 overflow-auto p-4 flex justify-center bg-gray-100 dark:bg-gray-900">
-        <canvas ref={canvasRef} className="shadow-lg bg-white" />
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-900"
+        onScroll={(e) => {
+          const scrollTop = e.currentTarget.scrollTop;
+          const containerHeight = e.currentTarget.clientHeight;
+          const pageHeight = containerHeight;
+          const newPage = Math.floor(scrollTop / pageHeight);
+          if (newPage !== currentPage && newPage >= 0 && newPage < totalPages) {
+            setCurrentPage(newPage);
+          }
+        }}
+      >
+        <div className="max-w-4xl mx-auto py-4 px-2 sm:px-4 space-y-2">
+          {pdfDoc && Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+            <div key={pageNum} className="flex justify-center">
+              <canvas
+                ref={(el) => {
+                  if (el) {
+                    canvasRefs.current.set(pageNum, el);
+                  }
+                }}
+                className="shadow-md bg-white max-w-full"
+                style={{ display: 'block' }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
