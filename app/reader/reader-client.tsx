@@ -17,21 +17,39 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
 
   useEffect(() => {
+    console.log("ReaderClient: useEffect triggered", { fileUrl, localFile: !!localFile });
+    // Clear error state when fileUrl or localFile changes
+    setError(null);
     if (localFile) {
       loadPdfFromFile(localFile);
     } else if (fileUrl) {
       loadPdfFromUrl(fileUrl);
     } else {
+      console.log("ReaderClient: No file provided, showing upload UI");
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileUrl, localFile]);
+
+  // Render all pages when pdfDoc is set and canvas refs are populated
+  useEffect(() => {
+    console.log("ReaderClient: Render useEffect triggered", { 
+      hasPdfDoc: !!pdfDoc, 
+      canvasRefsSize: canvasRefs.current.size,
+      totalPages 
+    });
+    if (pdfDoc && canvasRefs.current.size > 0) {
+      renderAllPages(pdfDoc);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pdfDoc, totalPages]);
 
   async function loadPdfFromUrl(url: string) {
     try {
       setLoading(true);
       setError(null);
 
+      console.log("ReaderClient: Fetching PDF from URL:", url);
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to load PDF file (status: ${response.status})`);
@@ -41,11 +59,11 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       const pdfData = new Uint8Array(await blob.arrayBuffer());
       const pdf = await loadPdfJsDocument(pdfData);
       
+      console.log("ReaderClient: PDF loaded successfully, pages:", pdf.numPages);
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       setCurrentPage(0);
-      
-      await renderAllPages(pdf);
+      // Rendering will be triggered by useEffect when canvas refs are ready
     } catch (err) {
       console.error("ReaderClient: Error loading PDF:", err);
       setError(err instanceof Error ? err.message : "Failed to load PDF");
@@ -59,13 +77,14 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
       setLoading(true);
       setError(null);
 
+      console.log("ReaderClient: Loading local PDF file:", file.name);
       const pdf = await loadPdfJsDocument(file);
       
+      console.log("ReaderClient: PDF loaded successfully, pages:", pdf.numPages);
       setPdfDoc(pdf);
       setTotalPages(pdf.numPages);
       setCurrentPage(0);
-      
-      await renderAllPages(pdf);
+      // Rendering will be triggered by useEffect when canvas refs are ready
     } catch (err) {
       console.error("ReaderClient: Error loading PDF:", err);
       setError(err instanceof Error ? err.message : "Failed to load PDF");
@@ -82,30 +101,48 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
   async function renderPage(num: number, doc: PDFDocumentProxy) {
     const canvas = canvasRefs.current.get(num);
-    if (!canvas) return;
+    if (!canvas) {
+      console.warn(`ReaderClient: Canvas not found for page ${num}`);
+      return;
+    }
 
     try {
+      console.log(`ReaderClient: Rendering page ${num}`);
       const page = await doc.getPage(num);
       const scale = calculateScale();
       const viewport = page.getViewport({ scale: scale / window.devicePixelRatio });
       
+      console.log(`ReaderClient: Page ${num} viewport:`, viewport.width, 'x', viewport.height);
+      
       const context = canvas.getContext("2d");
-      if (!context) return;
+      if (!context) {
+        console.error(`ReaderClient: Could not get 2d context for page ${num}`);
+        return;
+      }
 
       canvas.width = Math.floor(viewport.width * window.devicePixelRatio);
       canvas.height = Math.floor(viewport.height * window.devicePixelRatio);
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
 
+      console.log(`ReaderClient: Canvas ${num} dimensions:`, canvas.width, 'x', canvas.height);
+
       context.scale(window.devicePixelRatio, window.devicePixelRatio);
       await page.render({ canvasContext: context, viewport }).promise;
+      console.log(`ReaderClient: Page ${num} rendered successfully`);
       page.cleanup();
     } catch (err) {
-      console.error(`Failed to render page ${num}:`, err);
+      console.error(`ReaderClient: Failed to render page ${num}:`, err);
     }
   }
 
   async function renderAllPages(doc: PDFDocumentProxy) {
+    console.log("ReaderClient: Starting renderAllPages for", doc.numPages, "pages");
+    console.log("ReaderClient: Canvas refs available:", canvasRefs.current.size);
+    
+    // Wait a tick to ensure React has rendered the canvas elements
+    await new Promise(resolve => setTimeout(resolve, 0));
+    
     for (let num = 1; num <= doc.numPages; num++) {
       await renderPage(num, doc);
     }

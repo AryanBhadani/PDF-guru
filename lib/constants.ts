@@ -56,7 +56,7 @@ export const CORE_TOOLS = [
   {
     href: "/reader",
     title: "PDF Reader",
-    description: "View PDF pages with zoom and navigation controls in your browser.",
+    description: "View PDF pages in continuous vertical scroll in your browser.",
     icon: "BookOpen",
     navLabel: "PDF Reader",
     i18n: "pdfReader",
