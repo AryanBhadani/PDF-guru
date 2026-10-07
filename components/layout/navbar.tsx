@@ -37,7 +37,7 @@ export function Navbar() {
       className={cn(
         "sticky top-0 z-40 border-b backdrop-blur transition-colors",
         isHome
-          ? "border-slate-800/60 bg-[#060b13]/85 text-slate-200"
+          ? "border-slate-200 dark:border-slate-800/60 bg-white/85 dark:bg-[#060b13]/85 text-slate-700 dark:text-slate-200"
           : "border-border bg-background/80"
       )}
     >
@@ -52,8 +52,8 @@ export function Navbar() {
                 "rounded-md px-3 py-2 text-sm transition-colors",
                 isHome
                   ? pathname === href
-                    ? "bg-slate-800/70 text-cyan-300 font-medium"
-                    : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                    ? "bg-gray-100 dark:bg-slate-800/70 text-cyan-600 dark:text-cyan-300 font-medium"
+                    : "text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-white"
                   : pathname === href
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
@@ -70,8 +70,8 @@ export function Navbar() {
                   "gap-1 text-sm",
                   isHome
                     ? moreActive
-                      ? "bg-slate-800/70 text-cyan-300 font-medium"
-                      : "text-slate-300 hover:bg-slate-800/50 hover:text-white"
+                      ? "bg-gray-100 dark:bg-slate-800/70 text-cyan-600 dark:text-cyan-300 font-medium"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-white"
                     : moreActive
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground"
