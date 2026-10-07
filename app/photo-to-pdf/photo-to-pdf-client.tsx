@@ -20,6 +20,7 @@ import type { ImageFileItem } from "@/types/pdf";
 import type { PhotoPdfQuality } from "@/types/conversion";
 import { useT } from "@/components/i18n/language-provider";
 import { CameraScannerModal } from "@/components/scanner/camera-scanner-modal";
+import { SourceSelectionModal } from "@/components/scanner/source-selection-modal";
 
 export function PhotoToPdfClient() {
   const t = useT();
@@ -27,9 +28,11 @@ export function PhotoToPdfClient() {
   const [loading, setLoading] = useState(false);
   const [quality, setQuality] = useState<PhotoPdfQuality>("medium");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [sourceSelectionOpen, setSourceSelectionOpen] = useState(false);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
@@ -74,6 +77,11 @@ export function PhotoToPdfClient() {
 
   const handleTakePhotoClick = async () => {
     if (loading) return;
+    setSourceSelectionOpen(true);
+  };
+
+  const handleSelectCamera = async () => {
+    if (loading) return;
     if (
       typeof navigator !== "undefined" &&
       "mediaDevices" in navigator &&
@@ -101,6 +109,20 @@ export function PhotoToPdfClient() {
     }
   };
 
+  const handleSelectPhotos = () => {
+    if (loading) return;
+    try {
+      cameraInputRef.current?.click();
+    } catch {
+      toast.error(t("tools.photoToPdf.cameraDenied"));
+    }
+  };
+
+  const handleSelectGallery = () => {
+    if (loading) return;
+    galleryInputRef.current?.click();
+  };
+
   const handleScannerComplete = (scannedFiles: File[]) => {
     void processFiles(scannedFiles, true);
   };
@@ -111,6 +133,14 @@ export function PhotoToPdfClient() {
     const incoming = Array.from(files);
     event.target.value = "";
     void processFiles(incoming, true);
+  };
+
+  const handleGalleryCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    const incoming = Array.from(files);
+    event.target.value = "";
+    void processFiles(incoming, false);
   };
 
   const handleClear = () => {
@@ -161,7 +191,6 @@ export function PhotoToPdfClient() {
             disabled={loading}
             allowedTypes={IMAGE_MIME_TYPES}
             onFiles={handleFiles}
-            showGalleryButton={true}
           />
           <div className="flex items-center justify-center">
             <Button
@@ -181,15 +210,32 @@ export function PhotoToPdfClient() {
             type="file"
             accept="image/*"
             capture="environment"
+            multiple
             className="hidden"
             disabled={loading}
             onChange={handleCameraCapture}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            disabled={loading}
+            onChange={handleGalleryCapture}
           />
           <CameraScannerModal
             isOpen={scannerOpen}
             onClose={() => setScannerOpen(false)}
             onComplete={handleScannerComplete}
             onFallbackToFile={() => cameraInputRef.current?.click()}
+          />
+          <SourceSelectionModal
+            isOpen={sourceSelectionOpen}
+            onClose={() => setSourceSelectionOpen(false)}
+            onSelectCamera={handleSelectCamera}
+            onSelectPhotos={handleSelectPhotos}
+            onSelectGallery={handleSelectGallery}
           />
         </div>
 
