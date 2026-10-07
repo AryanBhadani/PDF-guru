@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { Images, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { MAX_FILE_SIZE_BYTES } from "@/lib/constants";
@@ -17,6 +17,7 @@ type FileUploadProps = {
   onFiles: (files: File[]) => void;
   maxSize?: number;
   allowedTypes?: string[];
+  showGalleryButton?: boolean;
 };
 
 export function FileUpload({
@@ -28,9 +29,11 @@ export function FileUpload({
   onFiles,
   maxSize = MAX_FILE_SIZE_BYTES,
   allowedTypes,
+  showGalleryButton = false,
 }: FileUploadProps) {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const handleFiles = useCallback(
@@ -98,10 +101,36 @@ export function FileUpload({
       <Upload className="mb-3 h-8 w-8 text-primary" />
       <p className="font-medium">{title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+      {showGalleryButton && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            galleryInputRef.current?.click();
+          }}
+          disabled={disabled}
+          className="mt-3 flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:pointer-events-none disabled:opacity-50 transition-colors"
+        >
+          <Images className="h-4 w-4" />
+          Choose from Gallery
+        </button>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
+        className="hidden"
+        disabled={disabled}
+        onChange={(event) => {
+          if (event.target.files) void handleFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
         multiple={multiple}
         className="hidden"
         disabled={disabled}

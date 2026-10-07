@@ -161,6 +161,7 @@ export function PhotoToPdfClient() {
             disabled={loading}
             allowedTypes={IMAGE_MIME_TYPES}
             onFiles={handleFiles}
+            showGalleryButton={true}
           />
           <div className="flex items-center justify-center">
             <Button

@@ -103,11 +103,12 @@ export function ScreenshotToWordClient() {
       <div className="space-y-6">
         <FileUpload
           accept="image/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
-          title={t("tools.screenshotToWord.drop")}
+          title={t("upload.dropImages")}
           hint={t("upload.hintImages")}
           disabled={loading}
           allowedTypes={IMAGE_MIME_TYPES}
           onFiles={handleFiles}
+          showGalleryButton={true}
         />
 
         {items.length === 0 ? (

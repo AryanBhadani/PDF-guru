@@ -155,13 +155,14 @@ export function MaskDocumentClient() {
           {t("tools.maskDocument.warning")}
         </div>
         <FileUpload
-          accept="application/pdf,image/*,.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.jfif"
+          accept="image/*,.pdf"
           multiple={false}
-          title={t("upload.dropPdfOrImage")}
-          hint={t("upload.hintImages")}
+          title={t("upload.dropFile")}
+          hint={t("upload.hintFile")}
           disabled={loading}
           allowedTypes={DOCUMENT_MIME_TYPES}
           onFiles={handleFiles}
+          showGalleryButton={true}
         />
         {!file || !previewUrl ? (
           <EmptyState

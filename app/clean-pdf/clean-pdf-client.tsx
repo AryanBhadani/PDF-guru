@@ -137,6 +137,7 @@ export function CleanPdfClient() {
           disabled={loading}
           allowedTypes={IMAGE_MIME_TYPES}
           onFiles={handleFiles}
+          showGalleryButton={true}
         />
 
         {!file || !source ? (
