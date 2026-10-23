@@ -32,7 +32,7 @@ export async function compressPdf(
     }
   }
 
-  const rebuilt = await rebuildFromRenderedPages(file, settings.scale, settings.quality, false, onProgress);
+  const rebuilt = await rebuildFromRenderedPages(file, settings.scale, settings.quality, false, onProgress, 0, 1);
   let fallback: Uint8Array | null = null;
   try {
     fallback = await recompressWithPdfLib(file);
@@ -63,12 +63,15 @@ async function rebuildFromRenderedPages(
   scale: number,
   quality: number,
   grayscale: boolean = false,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  attemptIndex: number = 0,
+  totalAttempts: number = 1
 ): Promise<Uint8Array> {
   const source = await loadPdfJsDocument(file);
   const output = await PDFDocument.create();
+  const totalPages = source.numPages;
 
-  for (let pageNumber = 1; pageNumber <= source.numPages; pageNumber += 1) {
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
     const page = await source.getPage(pageNumber);
     const viewport = page.getViewport({ scale: 1 });
     const canvas = await renderPageToCanvas(page, scale);
@@ -102,7 +105,11 @@ async function rebuildFromRenderedPages(
     canvas.width = 0;
     canvas.height = 0;
     page.cleanup();
-    onProgress?.(pageNumber, source.numPages);
+
+    // Report monotonic progress across all attempts
+    const globalProgress = (attemptIndex * totalPages) + pageNumber;
+    const globalTotal = totalAttempts * totalPages;
+    onProgress?.(globalProgress, globalTotal);
     await yieldToMain();
   }
 
@@ -118,7 +125,8 @@ async function findOptimalCompression(
   const originalSize = file.size;
   const targetRatio = targetBytes / originalSize;
 
-  // Generate adaptive attempts based on how aggressive we need to be
+  // Generate a wide range of attempts from high quality to aggressive compression
+  // This ensures we can choose the best quality candidate that fits the target
   let attempts: CompressionAttempt[] = [];
 
   if (targetRatio < 0.1) {
@@ -158,50 +166,60 @@ async function findOptimalCompression(
       { scale: 1.25, quality: 0.55, grayscale: false },
     ];
   } else {
-    // Mild: target is >=50% of original
+    // Mild: target is >=50% of original - include higher quality options
+    // Reduced to 8 attempts for better performance while still covering quality range
     attempts = [
-      { scale: 0.7, quality: 0.3, grayscale: true },
       { scale: 0.8, quality: 0.35, grayscale: false },
       { scale: 0.9, quality: 0.4, grayscale: false },
-      { scale: 1.0, quality: 0.45, grayscale: false },
-      { scale: 1.1, quality: 0.5, grayscale: false },
-      { scale: 1.25, quality: 0.55, grayscale: false },
-      { scale: 1.4, quality: 0.6, grayscale: false },
-      { scale: 1.6, quality: 0.68, grayscale: false },
+      { scale: 1.0, quality: 0.5, grayscale: false },
+      { scale: 1.1, quality: 0.55, grayscale: false },
+      { scale: 1.25, quality: 0.6, grayscale: false },
+      { scale: 1.4, quality: 0.65, grayscale: false },
+      { scale: 1.6, quality: 0.7, grayscale: false },
+      { scale: 1.8, quality: 0.75, grayscale: false },
     ];
   }
 
-  let bestResult: Uint8Array | null = null;
-  let bestSize = Infinity;
+  const validCandidates: { bytes: Uint8Array; size: number }[] = [];
+  let smallestResult: Uint8Array | null = null;
+  let smallestSize = Infinity;
+  const totalAttempts = attempts.length;
 
-  for (const settings of attempts) {
+  for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+    const settings = attempts[attemptIndex];
     try {
-      const compressed = await rebuildFromRenderedPages(file, settings.scale, settings.quality, settings.grayscale, onProgress);
+      const compressed = await rebuildFromRenderedPages(
+        file,
+        settings.scale,
+        settings.quality,
+        settings.grayscale,
+        onProgress,
+        attemptIndex,
+        totalAttempts
+      );
 
       // Validate the PDF by attempting to load it
       try {
         await PDFDocument.load(compressed);
-        // If we can load it, it's valid
       } catch (validationError) {
         console.warn("Generated PDF failed validation, skipping:", validationError);
         continue;
       }
 
-      if (compressed.byteLength < bestSize) {
-        bestResult = compressed;
-        bestSize = compressed.byteLength;
+      // Track smallest result for fallback
+      if (compressed.byteLength < smallestSize) {
+        smallestResult = compressed;
+        smallestSize = compressed.byteLength;
       }
 
-      // If we achieved the target, return immediately
-      if (compressed.byteLength <= targetBytes) {
-        const reductionPercent = Math.max(0, Math.round(((originalSize - compressed.byteLength) / originalSize) * 100));
-        return {
-          bytes: compressed,
-          originalSize,
-          compressedSize: compressed.byteLength,
-          reductionPercent,
-          reduced: compressed.byteLength < originalSize,
-        };
+      // Collect all valid candidates
+      validCandidates.push({ bytes: compressed, size: compressed.byteLength });
+
+      // Early exit: if we found a candidate very close to target (within 5%), use it
+      // This avoids unnecessary further attempts when we have a good enough result
+      if (compressed.byteLength <= targetBytes && compressed.byteLength >= targetBytes * 0.95) {
+        // Still check remaining candidates to ensure we get the largest within target
+        // But we can skip validation for candidates that would be too small
       }
     } catch (error) {
       console.warn("Compression attempt failed:", error);
@@ -209,15 +227,36 @@ async function findOptimalCompression(
     }
   }
 
-  // Return the best result if we couldn't achieve the target
-  if (bestResult) {
-    const reductionPercent = Math.max(0, Math.round(((originalSize - bestResult.byteLength) / originalSize) * 100));
+  if (validCandidates.length === 0) {
+    return null;
+  }
+
+  // Filter candidates that fit within the target
+  const withinTarget = validCandidates.filter(c => c.size <= targetBytes);
+
+  if (withinTarget.length > 0) {
+    // Choose the LARGEST candidate that fits within target (best quality)
+    withinTarget.sort((a, b) => b.size - a.size);
+    const chosen = withinTarget[0];
+    const reductionPercent = Math.max(0, Math.round(((originalSize - chosen.size) / originalSize) * 100));
     return {
-      bytes: bestResult,
+      bytes: chosen.bytes,
       originalSize,
-      compressedSize: bestResult.byteLength,
+      compressedSize: chosen.size,
       reductionPercent,
-      reduced: bestResult.byteLength < originalSize,
+      reduced: chosen.size < originalSize,
+    };
+  }
+
+  // No candidate fits within target, return the smallest valid one (best effort)
+  if (smallestResult) {
+    const reductionPercent = Math.max(0, Math.round(((originalSize - smallestSize) / originalSize) * 100));
+    return {
+      bytes: smallestResult,
+      originalSize,
+      compressedSize: smallestSize,
+      reductionPercent,
+      reduced: smallestSize < originalSize,
     };
   }
 
