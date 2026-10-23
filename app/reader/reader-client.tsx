@@ -35,10 +35,9 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
   useEffect(() => {
     console.log("ReaderClient: Render useEffect triggered", { 
       hasPdfDoc: !!pdfDoc, 
-      canvasRefsSize: canvasRefs.current.size,
       totalPages 
     });
-    if (pdfDoc && canvasRefs.current.size > 0) {
+    if (pdfDoc && totalPages > 0) {
       renderAllPages(pdfDoc);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,10 +137,15 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
   async function renderAllPages(doc: PDFDocumentProxy) {
     console.log("ReaderClient: Starting renderAllPages for", doc.numPages, "pages");
-    console.log("ReaderClient: Canvas refs available:", canvasRefs.current.size);
     
-    // Wait a tick to ensure React has rendered the canvas elements
-    await new Promise(resolve => setTimeout(resolve, 0));
+    // Wait for React to render the canvas elements and populate refs
+    let retries = 0;
+    while (canvasRefs.current.size < doc.numPages && retries < 20) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      retries++;
+    }
+    
+    console.log("ReaderClient: Canvas refs available after wait:", canvasRefs.current.size);
     
     for (let num = 1; num <= doc.numPages; num++) {
       await renderPage(num, doc);

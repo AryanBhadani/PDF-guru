@@ -154,7 +154,6 @@ export function ImageToPdfClient() {
             disabled={loading}
             allowedTypes={IMAGE_MIME_TYPES}
             onFiles={handleFiles}
-            showGalleryButton={true}
           />
           {items.length === 0 ? (
             <EmptyState

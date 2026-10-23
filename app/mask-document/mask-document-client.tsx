@@ -162,7 +162,6 @@ export function MaskDocumentClient() {
           disabled={loading}
           allowedTypes={DOCUMENT_MIME_TYPES}
           onFiles={handleFiles}
-          showGalleryButton={true}
         />
         {!file || !previewUrl ? (
           <EmptyState
