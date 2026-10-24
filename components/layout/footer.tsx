@@ -54,7 +54,25 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t py-4 text-center text-xs text-muted-foreground">
-        {APP_NAME} · {t("footer.privacy")}
+        <div className="flex flex-col gap-2 md:flex-row md:justify-center md:gap-4">
+          <span>{APP_NAME}</span>
+          <span>·</span>
+          <Link href="/privacy-policy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
+          <span>·</span>
+          <Link href="/terms-of-service" className="hover:text-foreground">
+            Terms of Service
+          </Link>
+          <span>·</span>
+          <Link href="/about" className="hover:text-foreground">
+            About
+          </Link>
+          <span>·</span>
+          <Link href="/contact" className="hover:text-foreground">
+            Contact
+          </Link>
+        </div>
       </div>
     </footer>
   );
