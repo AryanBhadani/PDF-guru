@@ -50,6 +50,11 @@ export function Footer() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link href="/guides" className="hover:text-foreground">
+                PDF Guides
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

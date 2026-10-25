@@ -193,6 +193,16 @@ export function CompressPdfClient() {
           </Card>
         )}
       </div>
+      <div className="mt-8 pt-6 border-t border-border text-sm text-muted-foreground">
+        <p className="mb-2 font-medium text-foreground">Related resources</p>
+        <div className="flex flex-wrap gap-4">
+          <a href="/guides/how-to-compress-pdf" className="text-cyan-600 dark:text-cyan-400 hover:underline">
+            📖 How to compress PDFs (guide)
+          </a>
+          <a href="/merge-pdf" className="hover:text-foreground transition-colors">Merge PDF</a>
+          <a href="/split-pdf" className="hover:text-foreground transition-colors">Split PDF</a>
+        </div>
+      </div>
     </PdfToolLayout>
   );
 }

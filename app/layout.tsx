@@ -1,21 +1,27 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
+import { SITE_URL } from "@/lib/metadata";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
   weight: "100 900",
+  display: "swap",
 });
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
   weight: "100 900",
+  display: "swap",
 });
+
+const OG_IMAGE = "/og-image.png";
 
 export const metadata: Metadata = {
   title: {
@@ -24,7 +30,7 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   applicationName: APP_NAME,
-  metadataBase: new URL("https://pdf-guru-j5ms-alpha.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   manifest: "/manifest.webmanifest",
   verification: {
     google: "JcA2nk8WAySQEZ-ABURfyfR69aJg13xR61rDvPtQNhg",
@@ -34,20 +40,31 @@ export const metadata: Metadata = {
     description: APP_DESCRIPTION,
     siteName: APP_NAME,
     type: "website",
+    locale: "en_IN",
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: `${APP_NAME} – Free Online PDF Tools`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${APP_NAME} – Free Online PDF Tools`,
+    description: APP_DESCRIPTION,
+    images: [
+      {
+        url: OG_IMAGE,
+        alt: `${APP_NAME} – Free Online PDF Tools`,
+      },
+    ],
   },
   appleWebApp: {
     title: APP_NAME,
     capable: true,
     statusBarStyle: "default",
-  },
-  other: {
-    "application/ld+json": JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      name: APP_NAME,
-      description: APP_DESCRIPTION,
-      url: "https://pdf-guru-j5ms-alpha.vercel.app",
-    }),
   },
 };
 
@@ -56,6 +73,38 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#0d6e60" },
     { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
   ],
+};
+
+const websiteSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: APP_NAME,
+  description: APP_DESCRIPTION,
+  url: SITE_URL,
+};
+
+const organizationSchema = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: APP_NAME,
+  url: SITE_URL,
+  logo: `${SITE_URL}/pdf-guru-icon.svg`,
+  description: APP_DESCRIPTION,
+};
+
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: APP_NAME,
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Web",
+  description: APP_DESCRIPTION,
+  url: SITE_URL,
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
 };
 
 export default function RootLayout({
@@ -75,6 +124,24 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen font-sans antialiased`}>
+        <Script
+          id="schema-website"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+        <Script
+          id="schema-organization"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <Script
+          id="schema-software"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+        />
         <Providers>
           <div className="flex flex-col">
             <Navbar />

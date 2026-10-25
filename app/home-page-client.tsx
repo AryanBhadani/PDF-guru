@@ -272,7 +272,7 @@ export function HomePageClient() {
                 variant="outline"
                 className="rounded-xl border-slate-300 dark:border-slate-700/80 bg-white dark:bg-slate-900/60 px-6 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/80 hover:text-gray-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-600 transition-all h-12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
               >
-                <Link href="#tools">Explore Tools</Link>
+                <Link href="/guides">📖 PDF Guides</Link>
               </Button>
 
               <Button
@@ -287,6 +287,7 @@ export function HomePageClient() {
                 </Link>
               </Button>
             </div>
+
           </div>
 
           {/* Right Column: Hero Graphic */}
@@ -415,6 +416,63 @@ export function HomePageClient() {
               </div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white">{step.title}</h3>
               <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{step.text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PDF Guides Section */}
+      <section className="relative z-10 mx-auto max-w-6xl px-4 py-8">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            <span>PDF</span> <span className="text-cyan-600 dark:text-cyan-400">Guides</span>
+          </h2>
+          <Link href="/guides" className="text-sm text-cyan-600 dark:text-cyan-400 hover:underline font-medium">
+            View all guides →
+          </Link>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[
+            {
+              href: "/guides/how-to-merge-pdf",
+              title: "How to Merge PDFs",
+              desc: "Combine multiple PDF files into one document in any order.",
+              tool: "/merge-pdf",
+              toolLabel: "Merge PDF",
+            },
+            {
+              href: "/guides/how-to-compress-pdf",
+              title: "How to Compress a PDF",
+              desc: "Reduce file size with low, medium, or high compression.",
+              tool: "/compress-pdf",
+              toolLabel: "Compress PDF",
+            },
+            {
+              href: "/guides/how-to-split-pdf",
+              title: "How to Split a PDF",
+              desc: "Extract page ranges or save every page as its own file.",
+              tool: "/split-pdf",
+              toolLabel: "Split PDF",
+            },
+          ].map((guide) => (
+            <div
+              key={guide.href}
+              className="rounded-2xl border border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0c1322]/80 p-5 backdrop-blur-md hover:border-cyan-400/40 dark:hover:border-cyan-500/40 transition-colors"
+            >
+              <h3 className="font-bold text-sm mb-1">
+                <Link href={guide.href} className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+                  {guide.title}
+                </Link>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">{guide.desc}</p>
+              <div className="flex gap-3">
+                <Link href={guide.href} className="text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:underline">
+                  Read guide →
+                </Link>
+                <Link href={guide.tool} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Use {guide.toolLabel}
+                </Link>
+              </div>
             </div>
           ))}
         </div>
