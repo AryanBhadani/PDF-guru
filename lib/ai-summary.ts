@@ -1,10 +1,18 @@
 import type { PdfSummary, SummaryRequest } from "@/types/ai";
 
+// ============================================================================
+// MOCK/DEMO IMPLEMENTATION - PRESERVED FOR FUTURE AI PROVIDER INTEGRATION
+// This is a placeholder implementation that returns mock responses.
+// To integrate with a real AI provider (OpenAI, Gemini, etc.), replace this
+// function with actual API calls while preserving the function signature.
+// ============================================================================
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function summarizePdf(request: SummaryRequest): Promise<PdfSummary> {
+  // MOCK: Simulate API delay and return placeholder text
   await delay(900 + Math.floor(Math.random() * 500));
 
   const pages = request.pageCount;

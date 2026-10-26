@@ -1,5 +1,5 @@
 import { createPageMetadata } from "@/lib/metadata";
-import { AiSummaryClient } from "./ai-summary-client";
+import { ComingSoon } from "@/components/pdf/coming-soon";
 
 export const metadata = createPageMetadata(
   "AI PDF Summary",
@@ -8,5 +8,10 @@ export const metadata = createPageMetadata(
 );
 
 export default function AiSummaryPage() {
-  return <AiSummaryClient />;
+  return (
+    <ComingSoon
+      title="AI PDF Summary"
+      description="Upload a PDF and get English and Hindi summaries. Processing stays in the browser for Phase 1."
+    />
+  );
 }
