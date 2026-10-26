@@ -24,10 +24,7 @@ const geistMono = localFont({
 const OG_IMAGE = "/og-image.png";
 
 export const metadata: Metadata = {
-  title: {
-    default: `${APP_NAME} – Free Online PDF Tools`,
-    template: `%s | ${APP_NAME}`,
-  },
+  title: `${APP_NAME} – Free Online PDF Tools`,
   description: APP_DESCRIPTION,
   applicationName: APP_NAME,
   metadataBase: new URL(SITE_URL),
