@@ -1,5 +1,5 @@
 import { createPageMetadata } from "@/lib/metadata";
-import { BulkWhatsappClient } from "./bulk-whatsapp-client";
+import { ComingSoonWhatsApp } from "@/components/pdf/coming-soon-whatsapp";
 
 export const metadata = createPageMetadata(
   "Bulk WhatsApp PDF - Send PDFs via WhatsApp Cloud API",
@@ -8,5 +8,10 @@ export const metadata = createPageMetadata(
 );
 
 export default function BulkWhatsappPage() {
-  return <BulkWhatsappClient />;
+  return (
+    <ComingSoonWhatsApp
+      title="Bulk WhatsApp PDF"
+      description="Send PDFs to customers using the official WhatsApp Cloud API. Map PDFs to customers and automate bulk messaging. Requires API configuration."
+    />
+  );
 }

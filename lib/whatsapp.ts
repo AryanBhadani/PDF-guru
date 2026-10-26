@@ -1,3 +1,10 @@
+// ============================================================================
+// BULK WHATSAPP IMPLEMENTATION - PRESERVED FOR FUTURE USE
+// This file contains the complete implementation for Bulk WhatsApp functionality.
+// The feature is temporarily marked as Coming Soon in the UI.
+// To re-enable, update app/bulk-whatsapp/page.tsx to use BulkWhatsappClient again.
+// ============================================================================
+
 export type WhatsAppSendInput = {
   phone: string;
   name: string;
