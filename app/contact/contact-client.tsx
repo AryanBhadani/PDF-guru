@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail, MessageSquare } from "lucide-react";
+import { FeedbackForm } from "@/components/feedback/feedback-form";
 
 const SUPPORT_EMAIL = "aryanbhadani48@gmail.com";
 
@@ -117,6 +118,11 @@ export function ContactClient() {
             </ul>
           </CardContent>
         </Card>
+
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight mb-4">Share Your Feedback</h2>
+          <FeedbackForm />
+        </div>
       </div>
     </div>
   );

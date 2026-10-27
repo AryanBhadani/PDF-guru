@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 import { SITE_URL } from "@/lib/metadata";
 
@@ -139,6 +140,7 @@ export default function RootLayout({
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
         />
+        <GoogleAnalytics />
         <Providers>
           <div className="flex flex-col">
             <Navbar />

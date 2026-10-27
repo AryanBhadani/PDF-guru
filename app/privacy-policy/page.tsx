@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
               <li><strong>Language preference:</strong> Stores your selected language for consistent localization.</li>
             </ul>
             <p>
-              We do not currently use analytics cookies, advertising trackers, or third-party marketing scripts.
+              We do not currently use analytics cookies, advertising trackers, or third-party marketing scripts. Optional Google Analytics 4 integration may be enabled in the future through environment variable configuration for basic usage analytics only. No sensitive file contents, personal data, or uploaded documents are tracked.
             </p>
           </section>
 
