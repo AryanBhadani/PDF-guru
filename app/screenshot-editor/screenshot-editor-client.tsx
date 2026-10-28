@@ -1,3 +1,10 @@
+// ============================================================================
+// SCREENSHOT EDITOR IMPLEMENTATION - PRESERVED FOR FUTURE USE
+// This file contains the complete implementation for the Screenshot Editor feature.
+// The feature is temporarily marked as Coming Soon in the UI.
+// To re-enable, update app/screenshot-editor/page.tsx to use ScreenshotEditorClient again.
+// ============================================================================
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";

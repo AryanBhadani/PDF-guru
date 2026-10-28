@@ -1,3 +1,10 @@
+// ============================================================================
+// MASK DOCUMENT IMPLEMENTATION - PRESERVED FOR FUTURE USE
+// This file contains the complete implementation for the Mask Document feature.
+// The feature is temporarily marked as Coming Soon in the UI.
+// To re-enable, update app/mask-document/page.tsx to use MaskDocumentClient again.
+// ============================================================================
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
