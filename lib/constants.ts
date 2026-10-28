@@ -54,13 +54,32 @@ export const CORE_TOOLS = [
     i18n: "splitPdf",
   },
   {
-    href: "/reader",
-    title: "PDF Reader",
-    description: "View PDF pages in continuous vertical scroll in your browser.",
-    icon: "BookOpen",
-    navLabel: "PDF Reader",
-    i18n: "pdfReader",
+    href: "/compress-pdf",
+    title: "Compress PDF",
+    description: "Reduce PDF size with low, medium, or high compression.",
+    icon: "Minimize2",
+    navLabel: "Compress PDF",
+    i18n: "compressPdf",
   },
+  {
+    href: "/pdf-to-ppt",
+    title: "PDF to PPT",
+    description: "Turn every PDF page into a PowerPoint slide.",
+    icon: "Presentation",
+    navLabel: "PDF to PPT",
+    i18n: "pdfToPpt",
+  },
+  {
+    href: "/pdf-editor",
+    title: "PDF Editor",
+    description: "Edit text, add images, delete content, and annotate PDFs directly in your browser.",
+    icon: "FileEdit",
+    navLabel: "PDF Editor",
+    i18n: "pdfEditor",
+  },
+] as const;
+
+export const ADVANCED_TOOLS = [
   {
     href: "/gst-invoice",
     title: "GST Invoice",
@@ -77,16 +96,13 @@ export const CORE_TOOLS = [
     navLabel: "AI Summary",
     i18n: "aiSummary",
   },
-] as const;
-
-export const ADVANCED_TOOLS = [
   {
-    href: "/pdf-to-ppt",
-    title: "PDF to PPT",
-    description: "Turn every PDF page into a PowerPoint slide.",
-    icon: "Presentation",
-    navLabel: "PDF to PPT",
-    i18n: "pdfToPpt",
+    href: "/reader",
+    title: "PDF Reader",
+    description: "View PDF pages in continuous vertical scroll in your browser.",
+    icon: "BookOpen",
+    navLabel: "PDF Reader",
+    i18n: "pdfReader",
   },
   {
     href: "/mask-document",
@@ -95,14 +111,6 @@ export const ADVANCED_TOOLS = [
     icon: "ShieldOff",
     navLabel: "Mask Document",
     i18n: "maskDocument",
-  },
-  {
-    href: "/compress-pdf",
-    title: "Compress PDF",
-    description: "Reduce PDF size with low, medium, or high compression.",
-    icon: "Minimize2",
-    navLabel: "Compress PDF",
-    i18n: "compressPdf",
   },
   {
     href: "/pdf-to-image",
@@ -130,14 +138,6 @@ export const SMART_TOOLS = [
     icon: "WandSparkles",
     navLabel: "Clean PDF",
     i18n: "cleanPdf",
-  },
-  {
-    href: "/pdf-editor",
-    title: "PDF Editor",
-    description: "Edit text, add images, delete content, and annotate PDFs directly in your browser.",
-    icon: "FileEdit",
-    navLabel: "PDF Editor",
-    i18n: "pdfEditor",
   },
   {
     href: "/screenshot-editor",
