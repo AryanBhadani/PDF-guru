@@ -32,14 +32,14 @@ export function FileList({ files, onMove, onRemove, onClear, disabled }: FileLis
         </p>
         <Button variant="ghost" size="sm" onClick={onClear} disabled={disabled}>
           <X className="h-4 w-4" />
-          {t("common.clearAll")}
+          <span className="hidden sm:inline ml-1">{t("common.clearAll")}</span>
         </Button>
       </div>
       <ul className="space-y-2">
         {files.map((file, index) => (
           <li
             key={file.id}
-            className="flex items-center gap-3 rounded-lg border bg-card p-3"
+            className="flex items-center gap-2 sm:gap-3 rounded-lg border bg-card p-2 sm:p-3"
           >
             <FileText className="h-5 w-5 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
@@ -53,6 +53,7 @@ export function FileList({ files, onMove, onRemove, onClear, disabled }: FileLis
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 disabled={disabled || index === 0}
                 aria-label="Move up"
                 onClick={() => onMove(file.id, -1)}
@@ -62,6 +63,7 @@ export function FileList({ files, onMove, onRemove, onClear, disabled }: FileLis
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 disabled={disabled || index === files.length - 1}
                 aria-label="Move down"
                 onClick={() => onMove(file.id, 1)}
@@ -71,6 +73,7 @@ export function FileList({ files, onMove, onRemove, onClear, disabled }: FileLis
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 disabled={disabled}
                 aria-label="Remove file"
                 onClick={() => onRemove(file.id)}

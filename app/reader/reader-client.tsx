@@ -255,17 +255,17 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
-      <div className="bg-white dark:bg-gray-800 shadow-sm px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 shadow-sm px-3 sm:px-4 py-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 gap-2">
         <button
           onClick={() => window.location.href = "/"}
           className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 flex items-center gap-2"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm font-medium">Back</span>
+          <span className="text-sm font-medium hidden sm:inline">Back</span>
         </button>
         
         {totalPages > 0 && (
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             Page {currentPage + 1} / {totalPages}
           </span>
         )}
@@ -280,7 +280,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
         
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium"
+          className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium whitespace-nowrap"
         >
           Open PDF
         </button>
@@ -308,7 +308,7 @@ export function ReaderClient({ fileUrl }: { fileUrl?: string }) {
                     canvasRefs.current.set(pageNum, el);
                   }
                 }}
-                className="shadow-md bg-white max-w-full"
+                className="shadow-md bg-white max-w-full h-auto"
                 style={{ display: 'block' }}
               />
             </div>

@@ -1,16 +1,86 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Mail, MessageSquare } from "lucide-react";
+import { toast } from "sonner";
 import { FeedbackForm } from "@/components/feedback/feedback-form";
 
 const SUPPORT_EMAIL = "aryanbhadani48@gmail.com";
 
 export function ContactClient() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Client-side validation
+    if (!formData.name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast.error("Please enter your email");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    if (!formData.message.trim()) {
+      toast.error("Please enter your message");
+      return;
+    }
+
+    if (formData.name.trim().length > 100) {
+      toast.error("Name must be less than 100 characters");
+      return;
+    }
+
+    if (formData.message.trim().length > 2000) {
+      toast.error("Message must be less than 2000 characters");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send message");
+      }
+
+      toast.success("Message sent successfully! We'll get back to you soon.");
+      setFormData({ name: "", email: "", message: "" });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-4xl px-4 py-12">
       <div className="space-y-8">
@@ -62,17 +132,30 @@ export function ContactClient() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Note: This form is a placeholder. To enable form submissions, integrate with a form service or backend API.
-              </p>
-              <div className="space-y-3">
+              <form onSubmit={handleSubmit} className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
-                  <Input id="name" placeholder="Your name" disabled />
+                  <Input
+                    id="name"
+                    placeholder="Your name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    disabled={isSubmitting}
+                    maxLength={100}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="contact-email">Email</Label>
-                  <Input id="contact-email" type="email" placeholder="your@email.com" disabled />
+                  <Input
+                    id="contact-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    disabled={isSubmitting}
+                    required
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="message">Message</Label>
@@ -80,16 +163,20 @@ export function ContactClient() {
                     id="message"
                     placeholder="How can we help?"
                     rows={4}
-                    disabled
+                    value={formData.message}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                    disabled={isSubmitting}
+                    maxLength={2000}
+                    required
                   />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {formData.message.length} / 2000
+                  </p>
                 </div>
-                <Button className="w-full" disabled>
-                  Send Message
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <em className="font-semibold">Note:</em> Form submissions are not currently available. Please use the email support option above to contact us.
-              </p>
+              </form>
             </CardContent>
           </Card>
         </div>

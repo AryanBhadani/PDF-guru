@@ -584,15 +584,15 @@ export function PdfEditorClient() {
         /* PDF Editor Workspace */
         <div className="space-y-4">
           {/* Main Top Toolbar */}
-          <Card className="p-3 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <Card className="p-2 sm:p-3 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               {/* Tool Selection Group */}
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1">
                 <Button
                   type="button"
                   variant={activeTool === "select" ? "default" : "outline"}
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                   onClick={() => setActiveTool("select")}
                 >
                   <MousePointer className="h-4 w-4" />
@@ -603,22 +603,22 @@ export function PdfEditorClient() {
                   type="button"
                   variant={activeTool === "add-text" ? "default" : "outline"}
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                   onClick={handleAddText}
                 >
                   <Type className="h-4 w-4" />
-                  <span>{t("tools.pdfEditor.addText")}</span>
+                  <span className="hidden sm:inline">{t("tools.pdfEditor.addText")}</span>
                 </Button>
 
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                   onClick={() => imageInputRef.current?.click()}
                 >
                   <ImageIcon className="h-4 w-4" />
-                  <span>{t("tools.pdfEditor.addImage")}</span>
+                  <span className="hidden sm:inline">{t("tools.pdfEditor.addImage")}</span>
                 </Button>
                 <input
                   ref={imageInputRef}
@@ -632,7 +632,7 @@ export function PdfEditorClient() {
                   type="button"
                   variant={activeTool === "whiteout" ? "default" : "outline"}
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-9"
                   onClick={() => setActiveTool("whiteout")}
                 >
                   <Eraser className="h-4 w-4" />
@@ -644,21 +644,21 @@ export function PdfEditorClient() {
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="gap-1.5 text-amber-800 dark:text-amber-300"
+                    className="gap-1.5 h-9 text-amber-800 dark:text-amber-300"
                     disabled={ocrLoading}
                     onClick={handleRunOcr}
                   >
                     {ocrLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>
+                        <span className="hidden sm:inline">
                           {t("tools.pdfEditor.ocrRunning")} ({ocrProgress}%)
                         </span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4 text-amber-500" />
-                        <span>{t("tools.pdfEditor.ocrTool")}</span>
+                        <span className="hidden sm:inline">{t("tools.pdfEditor.ocrTool")}</span>
                       </>
                     )}
                   </Button>
@@ -666,7 +666,7 @@ export function PdfEditorClient() {
               </div>
 
               {/* Navigation & Zoom Group */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
                 {/* Page Navigation */}
                 <div className="flex items-center gap-1 text-sm font-medium">
                   <Button
@@ -723,18 +723,18 @@ export function PdfEditorClient() {
                 <Button
                   type="button"
                   size="sm"
-                  className="gap-2 bg-primary font-medium text-primary-foreground shadow"
+                  className="gap-2 bg-primary font-medium text-primary-foreground shadow h-9"
                   disabled={saving || loading}
                   onClick={handleSaveAndDownload}
                 >
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  <span>{saving ? t("tools.pdfEditor.saving") : t("tools.pdfEditor.save")}</span>
+                  <span className="hidden sm:inline">{saving ? t("tools.pdfEditor.saving") : t("tools.pdfEditor.save")}</span>
                 </Button>
               </div>
             </div>
 
             {/* Hint bar based on tool */}
-            <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+            <div className="mt-2 border-t pt-2 text-xs text-muted-foreground hidden sm:block">
               {activeTool === "select" && "Click any text on the page to edit or delete it in-place."}
               {activeTool === "add-text" && "Click 'Add Text' above to insert movable text boxes anywhere on the page."}
               {activeTool === "add-image" && "Add images, signatures, or stamps onto your PDF."}
